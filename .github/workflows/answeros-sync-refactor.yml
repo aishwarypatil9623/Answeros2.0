@@ -34,6 +34,19 @@ jobs:
       - name: Migrate pages to shared data layer
         run: python tools/migrate_answeros_sync.py
 
+      - name: Repair generated HTML escaping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('answeros-settings.html')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('\\n<script>\\n', '\n<script>\n')
+          text = text.replace('\\n</script>\\n', '\n</script>\n')
+          path.write_text(text, encoding='utf-8')
+          assert '\\n<script>' not in text, 'settings contains escaped script markup'
+          print('Repaired settings HTML escaping.')
+          PY
+
       - name: Validate generated files
         run: |
           python - <<'PY'
@@ -48,6 +61,8 @@ jobs:
               text = Path(page).read_text(encoding='utf-8')
               assert 'answeros-data.js' in text, f'{page}: missing data layer'
           assert Path('answeros-initial-data.js').exists(), 'missing initial snapshot'
+          settings = Path('answeros-settings.html').read_text(encoding='utf-8')
+          assert '\\n<script>' not in settings, 'answeros-settings.html contains escaped script markup'
           print('Validation passed for all AnswerOS pages.')
           PY
           git diff --check
