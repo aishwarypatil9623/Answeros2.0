@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="answeros-initial-data.js"></script>
+<script src="answeros-data.js"></script>
 <meta charset="UTF-8" />
 <title>AnswerOS — Flashcards</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -186,68 +188,7 @@
    Examples/Data, Essential Keywords and My One Learning, all
    of which already exist in the real sheet.
 ============================================================ */
-const ANSWERS = [
-  {date:'2026-08-15', paper:'GS1', subtopic:'Indian Freedom Struggle — Cultural Awakening',
-   valueAdditions:["Bengal School of Art — Abanindranath Tagore's Bharat Mata painting broke from European style to foster indigenous aesthetic nationalism.","Anandamath — Bankim Chandra's novel gave the anthem Vande Mataram, galvanising the Swadeshi movement.","Charkha and Khadi — Gandhi turned spinning into a symbol of economic self-reliance and mass mobilisation."],
-   examples:["Swadeshi Movement (1905) — boycott of British goods paired with mass singing of Vande Mataram."],
-   keywords:["Cultural Nationalism","Subaltern Mobilisation","Ideological Hegemony"],
-   learning:"Ground every cultural argument in specific freedom-struggle personalities and movements."},
-  {date:'2026-08-14', paper:'GS2', subtopic:"India's Neighbourhood Policy",
-   valueAdditions:["SAARC Framework Agreement for Energy Cooperation — institutional foundation for regional power grid integration.","Cross-border transmission lines — Dhalkebar-Muzaffarpur link physically anchors India-Nepal energy ties."],
-   examples:["Mangdechhu hydroelectric project — demonstrates Bhutan-India energy cooperation strengthening bilateral ties."],
-   keywords:["Energy interdependence","Grid interconnection","Strategic autonomy"],
-   learning:"Substantiate every diplomatic argument with a concrete bilateral project."},
-  {date:'2026-08-13', paper:'GS2', subtopic:'Civil Society and NGOs Regulation',
-   valueAdditions:["Article 19(1)(c) — guarantees freedom to form associations, balanced under Article 19(4) for sovereignty."],
-   examples:["Aarey forest protest controversy — highlights concerns of regulatory misuse to curb environmental activism."],
-   keywords:["Civil society autonomy","National security oversight","Compliance burden"],
-   learning:"Ground general arguments in specific institutional mechanisms and legal provisions."},
-  {date:'2026-08-12', paper:'GS3', subtopic:'MSME Sector and Industrial Clusters',
-   valueAdditions:["SFURTI Scheme — provides financial assistance for traditional industry clusters and rural manufacturing.","Common Facility Centres (CFCs) — enable resource pooling for testing/design, cutting capex for individual MSMEs."],
-   examples:["Tiruppur textile cluster — shared infrastructure and export networks drive global apparel competitiveness."],
-   keywords:["Economies of agglomeration","Global Value Chains (GVCs)","Productivity trap"],
-   learning:"Ground general economic arguments in verified cluster-specific case studies."},
-  {date:'2026-08-11', paper:'GS2', subtopic:'Vulnerable Sections and Affirmative Action',
-   valueAdditions:["Article 341 — restricts Scheduled Caste status to Hindus, Sikhs, Buddhists via the 1950 Presidential Order.","Ranganath Misra Commission (2007) — recommended extending SC status to Dalit Christians and Muslims."],
-   examples:["Kerala church segregation — shows caste discrimination persisting within Christian denominations."],
-   keywords:["Substantive Equality","Constitutional Morality","Elite Capture"],
-   learning:"Integrate specific constitutional articles and commission reports to strengthen socio-legal debates."},
-  {date:'2026-08-10', paper:'GS3', subtopic:'Infrastructure: Ports and Digital Governance',
-   valueAdditions:["Sagarmala Programme — port-led development requiring robust digital infrastructure for logistics.","National Logistics Policy — integrates multimodal transport through the Unified Logistics Interface Platform."],
-   examples:["Sagarmala Port Community System — electronic document exchange reduces transaction time and cost."],
-   keywords:["Single-window clearance","Interoperability","Digital maritime ecosystem"],
-   learning:"Link administrative portals directly to specific governance reforms."},
-  {date:'2026-08-08', paper:'GS3', subtopic:'Digital Payments and Financial Inclusion',
-   valueAdditions:["Payments Infrastructure Development Fund (PIDF) — RBI subsidises acceptance infrastructure without user charges.","Brazil's PIX model — shows a free P2P instant payment system can still levy commercial merchant fees."],
-   examples:["NPCI data — UPI crossed 100 billion transactions in FY24, straining backend banking infrastructure."],
-   keywords:["Zero-MDR model","Merchant Discount Rate","Financial sustainability"],
-   learning:"Substantiate payment ecosystem debates with concrete cost-revenue metrics."},
-  {date:'2026-08-05', paper:'GS1', subtopic:'Climatology and Upper Air Phenomena',
-   valueAdditions:["Clear Air Turbulence (CAT) — micro-scale upper air hazard occurring near jet stream boundaries.","ICAO Annex provisions — international standard safety protocols for hazard reporting and route optimisation."],
-   examples:["IMD-WMO collaboration — shows institutional mechanisms for cross-border meteorological data sharing."],
-   keywords:["Jet Streams","Wind Shear","Tropopause Dynamics"],
-   learning:"Integrate rigorous scientific definitions for technical geography concepts."},
-  {date:'2026-08-01', paper:'GS2', subtopic:'Social Media, Digital Power and Democratic Governance',
-   valueAdditions:["Digital Personal Data Protection Act (DPDP Act) — establishes statutory obligations for processing digital data.","EU Digital Services Act (DSA) — global benchmark for regulating algorithmic transparency and platform accountability."],
-   examples:["IT Rules 2021 — India's framework for grievance redressal and due diligence for intermediaries."],
-   keywords:["Data sovereignty","Algorithmic bias","Platform accountability"],
-   learning:"Ground every digital governance argument in concrete regulatory acts and real platform challenges."},
-  {date:'2026-07-20', paper:'GS3', subtopic:'Space Technology — Vikram-1',
-   valueAdditions:["IN-SPACe — single-window autonomous nodal agency promoting and supervising private space activities.","Indian Space Policy 2023 — delineates operational roles for ISRO, NSIL, and private entities."],
-   examples:["Global space economy share — India accounts for roughly 2% of the $440 billion global space market."],
-   keywords:["Commercial space sector","Technology transfer","Space economy share"],
-   learning:"Integrate specific regulatory frameworks and funding data into technology answers."},
-  {date:'2026-07-15', paper:'GS2', subtopic:'Maritime Security and Global Chokepoints',
-   valueAdditions:["UNCLOS Article 38 — governs transit passage through straits used for international navigation.","Chabahar Port — serves as India's strategic alternative to bypass volatile West Asian bottlenecks."],
-   examples:["Strait of Hormuz dependency — approximately 30% of global petroleum liquid transit passes through it."],
-   keywords:["Chokepoint diplomacy","Geographic leverage","Energy security"],
-   learning:"Ground strategic arguments in international law and hard data."},
-  {date:'2026-07-11', paper:'GS2', subtopic:'Judiciary and Accountability',
-   valueAdditions:["Articles 124(4) and 218 — outline the constitutional impeachment process for proved misbehaviour.","Justice C.S. Karnan case (2017) — shows judicial immunity does not bar contempt or criminal accountability."],
-   examples:["Justice V. Ramaswami inquiry — first major impeachment motion, setting precedent for parliamentary oversight."],
-   keywords:["Constitutional morality","Impeachment procedure","Proved misbehaviour"],
-   learning:"Integrate specific constitutional articles and removal procedures into judicial governance answers."},
-];
+const ANSWERS = AnswerOSData.getAnswers();
 
 const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', PSIR:'#22a3a3', Essay:'#c98a1f'};
 const TYPE_COLORS = {va:{bg:'#eef3ee',fg:'#1c5c30',label:'Value Add'}, ex:{bg:'#e7edfa',fg:'#3b6fd5',label:'Example'}, kw:{bg:'#f3ecfb',fg:'#7a4fd5',label:'Keyword'}, learn:{bg:'#fbf5e8',fg:'#8a6212',label:'My Learning'}};
@@ -449,6 +390,11 @@ function renderDeckGrid(){
 }
 
 applyFilters();
+</script>
+
+<script>
+// AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.
+AnswerOSData.initPage({reloadOnChange:true});
 </script>
 </body>
 </html>

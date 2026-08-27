@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="answeros-initial-data.js"></script>
+<script src="answeros-data.js"></script>
 <meta charset="UTF-8" />
 <title>AnswerOS — Analytics</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -178,20 +180,7 @@
    directive + gapCategory (already tracked per answer) so this
    page can do real cross-cuts without re-fetching anything.
 ============================================================ */
-const ANSWERS = [
-  {date:'2026-08-15', paper:'GS1', marks:4.5, max:15, demand:45, directive:'Discuss', gapCategory:'Factual Accuracy'},
-  {date:'2026-08-14', paper:'GS2', marks:4.5, max:15, demand:45, directive:'Examine', gapCategory:'Examples & Data'},
-  {date:'2026-08-13', paper:'GS2', marks:6.5, max:15, demand:45, directive:'Critically examine', gapCategory:'Legal/Institutional Backing'},
-  {date:'2026-08-12', paper:'GS3', marks:7,   max:15, demand:60, directive:'Examine', gapCategory:'Examples & Data'},
-  {date:'2026-08-11', paper:'GS2', marks:5,   max:15, demand:55, directive:'Critically examine', gapCategory:'Legal/Institutional Backing'},
-  {date:'2026-08-10', paper:'GS3', marks:6.5, max:15, demand:60, directive:'Examine', gapCategory:'Depth & Specificity'},
-  {date:'2026-08-08', paper:'GS3', marks:6.5, max:15, demand:55, directive:'Examine', gapCategory:'Examples & Data'},
-  {date:'2026-08-05', paper:'GS1', marks:5.5, max:15, demand:45, directive:'Discuss and Examine', gapCategory:'Factual Accuracy'},
-  {date:'2026-08-01', paper:'GS2', marks:4.5, max:15, demand:50, directive:'Examine', gapCategory:'Examples & Data'},
-  {date:'2026-07-20', paper:'GS3', marks:5,   max:15, demand:45, directive:'Examine', gapCategory:'Depth & Specificity'},
-  {date:'2026-07-15', paper:'GS2', marks:4.5, max:15, demand:50, directive:'Examine', gapCategory:'Examples & Data'},
-  {date:'2026-07-11', paper:'GS2', marks:3,   max:10, demand:40, directive:'Examine', gapCategory:'Legal/Institutional Backing'},
-];
+const ANSWERS = AnswerOSData.getAnswers();
 ANSWERS.forEach(a=> a.score = a.marks/a.max*10);
 
 const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#c98a1f', PSIR:'#22a3a3'};
@@ -336,6 +325,11 @@ document.getElementById('gapStrip').innerHTML = gaps.map((g,i)=>{
 }).join('');
 const bigGaps = gaps.filter(g=>g>=7).length;
 document.getElementById('consistencyInsight').innerHTML = `Longest stretch without an answer: <b>${longestGap} days</b> (mid-to-late July). Outside that one dip, you're writing every 1–5 days — the pattern breaks around long gaps, not short ones. ${bigGaps>1?'Watch for repeat week-plus gaps — they compound.':'One outlier so far — worth watching if it repeats.'}`;
+</script>
+
+<script>
+// AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.
+AnswerOSData.initPage({reloadOnChange:true});
 </script>
 </body>
 </html>

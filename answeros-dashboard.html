@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="answeros-initial-data.js"></script>
+<script src="answeros-data.js"></script>
 <meta charset="UTF-8" />
 <title>AnswerOS — Answer Writing Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -494,20 +496,7 @@ function navIcon(name){
    Max Marks, Status ... etc.
    Replace this array with real rows pasted from the sheet.
 ============================================================ */
-const ANSWERS = [
-  {date:'2026-08-15', paper:'GS1', subject:'Modern Indian History', subtopic:"Indian Freedom Struggle — Cultural Awakening", marks:4.5, max:15, status:'PROCESSED', gapCategory:'Factual Accuracy'},
-  {date:'2026-08-14', paper:'GS2', subject:'International Relations', subtopic:"India's Neighbourhood Policy", marks:4.5, max:15, status:'PROCESSED', gapCategory:'Examples & Data'},
-  {date:'2026-08-13', paper:'GS2', subject:'Polity and Governance', subtopic:'Civil Society and NGOs Regulation', marks:6.5, max:15, status:'PROCESSED', gapCategory:'Legal/Institutional Backing'},
-  {date:'2026-08-12', paper:'GS3', subject:'Economy', subtopic:'MSME Sector and Industrial Clusters', marks:7, max:15, status:'PROCESSED', gapCategory:'Examples & Data'},
-  {date:'2026-08-11', paper:'GS2', subject:'Social Justice', subtopic:'Vulnerable Sections and Affirmative Action', marks:5, max:15, status:'PROCESSED', gapCategory:'Legal/Institutional Backing'},
-  {date:'2026-08-10', paper:'GS3', subject:'Economy', subtopic:'Infrastructure: Ports and Digital Governance', marks:6.5, max:15, status:'PROCESSED', gapCategory:'Depth & Specificity'},
-  {date:'2026-08-08', paper:'GS3', subject:'Economy', subtopic:'Digital Payments and Financial Inclusion', marks:6.5, max:15, status:'PROCESSED', gapCategory:'Examples & Data'},
-  {date:'2026-08-05', paper:'GS1', subject:'Geography', subtopic:'Climatology and Upper Air Phenomena', marks:5.5, max:15, status:'PROCESSED', gapCategory:'Factual Accuracy'},
-  {date:'2026-08-01', paper:'GS2', subject:'Governance', subtopic:'Social Media, Digital Power and Democratic Governance', marks:4.5, max:15, status:'PROCESSED', gapCategory:'Examples & Data'},
-  {date:'2026-07-20', paper:'GS3', subject:'Science and Technology', subtopic:'Space Technology — Vikram-1', marks:5, max:15, status:'PROCESSED', gapCategory:'Depth & Specificity'},
-  {date:'2026-07-15', paper:'GS2', subject:'International Relations', subtopic:'Maritime Security and Global Chokepoints', marks:4.5, max:15, status:'PROCESSED', gapCategory:'Examples & Data'},
-  {date:'2026-07-11', paper:'GS2', subject:'Polity and Governance', subtopic:'Judiciary and Accountability', marks:3, max:10, status:'PROCESSED', gapCategory:'Legal/Institutional Backing'},
-];
+const ANSWERS = AnswerOSData.getAnswers();
 
 const DEMAND_PCT = {'2026-08-15':45,'2026-08-14':45,'2026-08-13':45,'2026-08-12':60,'2026-08-11':55,'2026-08-10':60,'2026-08-08':55,'2026-08-05':45,'2026-08-01':50,'2026-07-20':45,'2026-07-15':50,'2026-07-11':40};
 ANSWERS.forEach(a=> a.demand = DEMAND_PCT[a.date]);
@@ -540,7 +529,7 @@ document.getElementById('streakTop').textContent = currentStreak + ' Days';
 
 /* ---------- Today's Goal pill (computed from real data) ---------- */
 (function(){
-  const todayStr = '2026-08-16'; // matches TODAY used across AnswerOS; update when live-syncing
+  const todayStr = AnswerOSData.formatDate(AnswerOSData.today()); // matches TODAY used across AnswerOS; update when live-syncing
   const DAILY_TARGET = 2; // change this on the Goals page to adjust
   const todayCount = ANSWERS.filter(a=>a.date===todayStr).length;
   const pct = Math.min(100, Math.round(todayCount/DAILY_TARGET*100));
@@ -819,6 +808,11 @@ document.getElementById('refreshBtn').addEventListener('click', async ()=>{
   toast.classList.add('show');
   setTimeout(()=> toast.classList.remove('show'), copied ? 4500 : 7000);
 });
+</script>
+
+<script>
+// AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.
+AnswerOSData.initPage({reloadOnChange:true});
 </script>
 </body>
 </html>
