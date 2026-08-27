@@ -550,7 +550,7 @@ document.getElementById('copyPromptBtn').addEventListener('click', async ()=>{
    below for localStorage.getItem/setItem — browser storage works fine on
    a real site, just not inside Claude's artifact preview.
 ------------------------------------------------------------------------- */
-let connectedCsvUrl = ''; // → on your own host: let connectedCsvUrl = localStorage.getItem('answeros_csv_url') || '';
+let connectedCsvUrl = AnswerOSData.getConfig().syncUrl || '';
 
 function normalizePaper(raw){
   const t = (raw||'').toLowerCase();
@@ -613,27 +613,19 @@ function csvRowsToAnswers(rows){
 }
 
 document.getElementById('syncNowBtn').addEventListener('click', async ()=>{
-  const url = document.getElementById('csvUrlInput').value.trim();
+  const url = document.getElementById('csvUrlInput').value.trim() || AnswerOSData.getConfig().syncUrl;
   const statusEl = document.getElementById('syncStatus');
-  if(!url){ statusEl.textContent = 'Paste your published CSV link first.'; statusEl.className='sync-status error'; return; }
-  statusEl.textContent = 'Fetching…'; statusEl.className = 'sync-status';
+  if(!url){ statusEl.textContent = 'Configure your Apps Script Web App URL in Settings first.'; statusEl.className='sync-status error'; return; }
+  statusEl.textContent = 'Fetching…'; statusEl.className='sync-status';
   try{
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const csvText = await res.text();
-    const parsed = Papa.parse(csvText, {header:true, skipEmptyLines:true});
-    const newAnswers = csvRowsToAnswers(parsed.data);
-    if(newAnswers.length===0) throw new Error('No rows found — check the sheet has data and is published as CSV.');
-    ANSWERS.length = 0;
-    ANSWERS.push(...newAnswers);
-    connectedCsvUrl = url; // → on your own host: localStorage.setItem('answeros_csv_url', url);
-    openIds.clear();
-    render();
-    statusEl.textContent = `Synced ${newAnswers.length} answers from your live sheet.`;
-    statusEl.className = 'sync-status ok';
+    AnswerOSData.saveConfig({syncUrl:url});
+    const result = await AnswerOSData.sync({reloadOnChange:true});
+    connectedCsvUrl = url;
+    statusEl.textContent = `Synced ${result.count} answers from your Google Sheet.`;
+    statusEl.className='sync-status ok';
   }catch(err){
-    statusEl.textContent = `Live fetch didn't go through (${err.message}). Expected here — Claude's preview sandbox blocks outbound requests. This will work once hosted (GitHub Pages, etc.), or use "Copy refresh prompt" for right now.`;
-    statusEl.className = 'sync-status error';
+    statusEl.textContent = `Sync failed: ${err.message}`;
+    statusEl.className='sync-status error';
   }
 });
 </script>

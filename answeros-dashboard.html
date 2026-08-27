@@ -498,8 +498,7 @@ function navIcon(name){
 ============================================================ */
 const ANSWERS = AnswerOSData.getAnswers();
 
-const DEMAND_PCT = {'2026-08-15':45,'2026-08-14':45,'2026-08-13':45,'2026-08-12':60,'2026-08-11':55,'2026-08-10':60,'2026-08-08':55,'2026-08-05':45,'2026-08-01':50,'2026-07-20':45,'2026-07-15':50,'2026-07-11':40};
-ANSWERS.forEach(a=> a.demand = DEMAND_PCT[a.date]);
+ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
 const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3'};
 
 /* ---------- derived stats ---------- */
@@ -682,7 +681,7 @@ document.getElementById('calNext').addEventListener('click', ()=>{
   calMonth++; if(calMonth>11){ calMonth=0; calYear++; } renderCalendar();
 });
 document.getElementById('calToday').addEventListener('click', ()=>{
-  calYear=2026; calMonth=7; renderCalendar();
+  const now = AnswerOSData.today(); calYear=now.getFullYear(); calMonth=now.getMonth(); renderCalendar();
 });
 
 /* ---------- score improvement bar ---------- */
@@ -791,22 +790,21 @@ document.getElementById('bottomStrip').innerHTML = bottomData.map(([ic,val,label
 `).join('');
 
 /* ---------- Refresh from Sheet trigger ---------- */
-const REFRESH_PROMPT = "Refresh AnswerOS (dashboard + All Answers) from my Mains Tracker Google Sheet — pull the latest rows and rebuild both pages.";
 document.getElementById('refreshBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('refreshBtn');
   const toast = document.getElementById('refreshToast');
   btn.classList.add('spinning');
-  let copied = false;
   try{
-    await navigator.clipboard.writeText(REFRESH_PROMPT);
-    copied = true;
-  }catch(err){ copied = false; }
-  btn.classList.remove('spinning');
-  toast.textContent = copied
-    ? "Copied! Paste this into your Claude chat to pull your latest sheet data."
-    : `Couldn't copy automatically — just type this into your Claude chat: "${REFRESH_PROMPT}"`;
-  toast.classList.add('show');
-  setTimeout(()=> toast.classList.remove('show'), copied ? 4500 : 7000);
+    const result = await AnswerOSData.sync({reloadOnChange:true});
+    toast.textContent = `Synced ${result.count} answers from your Google Sheet.`;
+    toast.classList.add('show');
+  }catch(err){
+    toast.textContent = `Sync failed: ${err.message}`;
+    toast.classList.add('show');
+  }finally{
+    btn.classList.remove('spinning');
+    setTimeout(()=> toast.classList.remove('show'), 4500);
+  }
 });
 </script>
 
