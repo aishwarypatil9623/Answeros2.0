@@ -1,0 +1,200 @@
+/* AnswerOS shared data layer
+   Google Sheet -> Apps Script -> local cache -> every page.
+*/
+(function () {
+  'use strict';
+
+  const STORAGE = {
+    config: 'answeros_config_v1',
+    answers: 'answeros_answers_v1',
+    hash: 'answeros_answers_hash_v1',
+    syncedAt: 'answeros_last_sync_v1'
+  };
+
+  const DEFAULTS = {
+    syncUrl: 'https://script.google.com/macros/s/AKfycbyUFgUono_7Ce9XRuBND1sZXxcwfbiNw_yWn0GCHlsiAzmUiIpYb-_n6545Bv1PyUD3/exec',
+    syncToken: '',
+    autoSyncEnabled: false,
+    syncIntervalMinutes: 30
+  };
+
+  function readJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (_) { return fallback; }
+  }
+
+  function getConfig() {
+    return Object.assign({}, DEFAULTS, readJSON(STORAGE.config, {}));
+  }
+
+  function saveConfig(patch) {
+    const next = Object.assign({}, getConfig(), patch || {});
+    localStorage.setItem(STORAGE.config, JSON.stringify(next));
+    return next;
+  }
+
+  function normalizePaper(value) {
+    return String(value == null ? '' : value).trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  function toNumber(value) {
+    if (value === '' || value == null) return null;
+    const n = Number(String(value).replace(/,/g, '').replace('%', ''));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function toDateString(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function deriveGapCategory(row) {
+    const text = [row['Missing / Extra Improvements'], row['Overall Feedback'], row['My One Learning']]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (/example|data|quantif|statistic/.test(text)) return 'Examples & Data';
+    if (/judgment|article|constitutional|legal|statut/.test(text)) return 'Legal/Institutional Backing';
+    if (/analysis|analytical|critical|depth|causal/.test(text)) return 'Critical Analysis';
+    if (/directive|demand/.test(text)) return 'Demand/Directive';
+    if (/intro/.test(text)) return 'Introduction';
+    if (/conclusion/.test(text)) return 'Conclusion';
+    if (/technical|scientific|mechanism/.test(text)) return 'Technical Precision';
+    return 'Content/Depth';
+  }
+
+  function normalizeRow(row, index) {
+    row = row || {};
+    const date = toDateString(row['Question Date']);
+    const marks = toNumber(row['Marks']);
+    const max = toNumber(row['Max Marks']);
+    const demand = toNumber(row['% of Demand Addressed']);
+    return Object.assign({}, row, {
+      id: String(row['PDF ID'] || `${date}-${normalizePaper(row.Paper)}-${index}`),
+      date,
+      paper: normalizePaper(row.Paper),
+      subject: String(row.Subject || '').trim(),
+      subtopic: String(row.Subtopic || '').trim(),
+      directive: String(row.Directive || '').trim(),
+      marks,
+      max,
+      demand,
+      demandPct: demand == null ? null : (demand <= 1 ? demand * 100 : demand),
+      wordCount: toNumber(row['Word Count']),
+      question: String(row.Question || '').trim(),
+      status: String(row.Status || '').trim(),
+      gapCategory: deriveGapCategory(row)
+    });
+  }
+
+  function normalizeRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map(normalizeRow)
+      .filter(r => r.date || r.question || r.subject)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+
+  function stableHash(value) {
+    const text = JSON.stringify(value);
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  function getAnswers() {
+    return readJSON(STORAGE.answers, []);
+  }
+
+  function getLastSync() {
+    return localStorage.getItem(STORAGE.syncedAt) || '';
+  }
+
+  function buildUrl(config) {
+    if (!config.syncUrl) return '';
+    const url = new URL(config.syncUrl);
+    if (config.syncToken) url.searchParams.set('token', config.syncToken);
+    url.searchParams.set('_ts', Date.now());
+    return url.toString();
+  }
+
+  async function sync(options) {
+    const opts = Object.assign({ reloadOnChange: false }, options || {});
+    const config = getConfig();
+    if (!config.syncUrl) throw new Error('No Apps Script Web App URL configured.');
+
+    const response = await fetch(buildUrl(config), { method: 'GET', mode: 'cors', cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!payload || payload.ok !== true || !Array.isArray(payload.rows)) {
+      throw new Error(payload && payload.error ? payload.error : 'Invalid AnswerOS API response.');
+    }
+
+    const rows = normalizeRows(payload.rows);
+    const nextHash = stableHash(rows);
+    const previousHash = localStorage.getItem(STORAGE.hash) || '';
+    const changed = nextHash !== previousHash;
+
+    localStorage.setItem(STORAGE.answers, JSON.stringify(rows));
+    localStorage.setItem(STORAGE.hash, nextHash);
+    localStorage.setItem(STORAGE.syncedAt, new Date().toISOString());
+
+    if (changed && opts.reloadOnChange) {
+      const reloadKey = `answeros_reload_${nextHash}`;
+      if (!sessionStorage.getItem(reloadKey)) {
+        sessionStorage.setItem(reloadKey, '1');
+        setTimeout(() => location.reload(), 40);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('answeros:data-updated', {
+      detail: { answers: rows, changed, count: rows.length, syncedAt: getLastSync() }
+    }));
+
+    return { rows, changed, count: rows.length, syncedAt: getLastSync() };
+  }
+
+  function today() { return new Date(); }
+
+  function formatDate(value) {
+    const d = value instanceof Date ? value : new Date(value);
+    return toDateString(d);
+  }
+
+  function initPage(options) {
+    const opts = Object.assign({ reloadOnChange: true }, options || {});
+    const config = getConfig();
+    sync(opts).catch(error => {
+      console.warn('[AnswerOS] Sync failed; using cached data.', error);
+      window.dispatchEvent(new CustomEvent('answeros:sync-error', { detail: { error } }));
+    });
+
+    if (config.autoSyncEnabled) {
+      const ms = Math.max(5, Number(config.syncIntervalMinutes) || 30) * 60 * 1000;
+      window.setInterval(() => {
+        sync(opts).catch(error => console.warn('[AnswerOS] Auto-sync failed.', error));
+      }, ms);
+    }
+  }
+
+  window.AnswerOSData = {
+    STORAGE,
+    DEFAULTS,
+    getConfig,
+    saveConfig,
+    getAnswers,
+    getLastSync,
+    normalizeRows,
+    sync,
+    initPage,
+    today,
+    formatDate
+  };
+})();
