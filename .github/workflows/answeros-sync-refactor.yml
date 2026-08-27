@@ -1,0 +1,65 @@
+name: AnswerOS sync refactor
+
+on:
+  push:
+    branches: [sync-refactor]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate current Sheet snapshot
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          url = 'https://script.google.com/macros/s/AKfycbyUFgUono_7Ce9XRuBND1sZXxcwfbiNw_yWn0GCHlsiAzmUiIpYb-_n6545Bv1PyUD3/exec'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              payload = json.loads(response.read().decode('utf-8'))
+          if not payload.get('ok') or not isinstance(payload.get('rows'), list):
+              raise SystemExit('Apps Script did not return the expected {ok:true, rows:[...]} response.')
+          with open('answeros-initial-data.js', 'w', encoding='utf-8') as f:
+              f.write('window.AnswerOSInitialData = ' + json.dumps(payload['rows'], ensure_ascii=False, separators=(',', ':')) + ';\n')
+          print(f"Snapshot rows: {len(payload['rows'])}")
+          PY
+
+      - name: Migrate pages to shared data layer
+        run: python tools/migrate_answeros_sync.py
+
+      - name: Validate generated files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          pages = [
+            'answeros-dashboard.html','answeros-all-answers.html','answeros-analytics.html',
+            'answeros-calendar.html','answeros-pyq-tracker.html','answeros-learnings.html',
+            'answeros-revision-hub.html','answeros-flashcards.html','answeros-goals.html',
+            'answeros-settings.html'
+          ]
+          for page in pages:
+              text = Path(page).read_text(encoding='utf-8')
+              assert 'answeros-data.js' in text, f'{page}: missing data layer'
+          assert Path('answeros-initial-data.js').exists(), 'missing initial snapshot'
+          print('Validation passed for all AnswerOS pages.')
+          PY
+          git diff --check
+
+      - name: Commit refactor
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add answeros-*.html answeros-data.js answeros-initial-data.js tools/migrate_answeros_sync.py
+          if git diff --cached --quiet; then
+            echo 'No migration changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Refactor AnswerOS to shared Sheet sync'
+          git push origin sync-refactor
