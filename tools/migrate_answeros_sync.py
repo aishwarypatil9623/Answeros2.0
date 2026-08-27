@@ -58,6 +58,24 @@ def replace_answers_array(text: str) -> str:
     raise RuntimeError(f'Could not find end of ANSWERS array in {marker.group(0)[:80]}')
 
 
+def ensure_answers_binding(text: str) -> str:
+    """Some older pages had their embedded array removed by the first migration but no replacement declaration.
+    Add the shared binding before the first runtime reference so those pages execute normally."""
+    if re.search(r'\b(?:const|let|var)\s+ANSWERS\s*=', text):
+        return text
+    if 'ANSWERS' not in text:
+        return text
+    anchor = text.find('/* ---------- derived stats ---------- */')
+    if anchor == -1:
+        anchor = text.find('<script>')
+        if anchor == -1:
+            return text
+        insert_at = text.find('\n', anchor)
+    else:
+        insert_at = anchor
+    return text[:insert_at] + '\nconst ANSWERS = AnswerOSData.getAnswers();\n' + text[insert_at:]
+
+
 def add_data_scripts(text: str) -> str:
     if DATA_SCRIPT not in text:
         text = text.replace('<head>', '<head>\n' + INITIAL_SCRIPT + '\n' + DATA_SCRIPT, 1)
@@ -66,13 +84,84 @@ def add_data_scripts(text: str) -> str:
     return text
 
 
+def patch_dashboard(text: str) -> str:
+    # Never overwrite live demand values with the old date-keyed sample map.
+    text = re.sub(
+        r"const DEMAND_PCT = \{.*?\};\s*ANSWERS\.forEach\(a=> a\.demand = DEMAND_PCT\[a\.date\]\);",
+        "ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });",
+        text,
+        flags=re.S,
+    )
+    # Use the actual current date for the calendar's Today action.
+    text = text.replace(
+        "calYear=2026; calMonth=7; renderCalendar();",
+        "const now = AnswerOSData.today(); calYear=now.getFullYear(); calMonth=now.getMonth(); renderCalendar();",
+    )
+    # Replace the old Claude-copy refresh behavior with the real shared sync.
+    old = re.search(r"/\* ---------- Refresh from Sheet trigger ---------- \*/.*?document\.getElementById\('refreshBtn'\)\.addEventListener\('click', async \(\)=>\{.*?\n\}\);", text, flags=re.S)
+    if old:
+        new = '''/* ---------- Refresh from Sheet trigger ---------- */
+document.getElementById('refreshBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('refreshBtn');
+  const toast = document.getElementById('refreshToast');
+  btn.classList.add('spinning');
+  try{
+    const result = await AnswerOSData.sync({reloadOnChange:true});
+    toast.textContent = `Synced ${result.count} answers from your Google Sheet.`;
+    toast.classList.add('show');
+  }catch(err){
+    toast.textContent = `Sync failed: ${err.message}`;
+    toast.classList.add('show');
+  }finally{
+    btn.classList.remove('spinning');
+    setTimeout(()=> toast.classList.remove('show'), 4500);
+  }
+});'''
+        text = text[:old.start()] + new + text[old.end():]
+    return text
+
+
+def patch_all_answers(text: str) -> str:
+    # The old page contained a separate CSV sync implementation. The shared Apps Script layer is now canonical.
+    text = text.replace(
+        "let connectedCsvUrl = ''; // → on your own host: let connectedCsvUrl = localStorage.getItem('answeros_csv_url') || '';",
+        "let connectedCsvUrl = AnswerOSData.getConfig().syncUrl || '';",
+    )
+    # Make the visible Sync Now button use the shared Apps Script endpoint rather than a CSV URL.
+    old = re.search(r"document\.getElementById\('syncNowBtn'\)\.addEventListener\('click', async \(\)=>\{.*?\n\}\);", text, flags=re.S)
+    if old:
+        new = '''document.getElementById('syncNowBtn').addEventListener('click', async ()=>{
+  const url = document.getElementById('csvUrlInput').value.trim() || AnswerOSData.getConfig().syncUrl;
+  const statusEl = document.getElementById('syncStatus');
+  if(!url){ statusEl.textContent = 'Configure your Apps Script Web App URL in Settings first.'; statusEl.className='sync-status error'; return; }
+  statusEl.textContent = 'Fetching…'; statusEl.className='sync-status';
+  try{
+    AnswerOSData.saveConfig({syncUrl:url});
+    const result = await AnswerOSData.sync({reloadOnChange:true});
+    connectedCsvUrl = url;
+    statusEl.textContent = `Synced ${result.count} answers from your Google Sheet.`;
+    statusEl.className='sync-status ok';
+  }catch(err){
+    statusEl.textContent = `Sync failed: ${err.message}`;
+    statusEl.className='sync-status error';
+  }
+});'''
+        text = text[:old.start()] + new + text[old.end():]
+    return text
+
+
 def migrate_page(path: Path) -> bool:
     text = path.read_text(encoding='utf-8')
     original = text
     text = add_data_scripts(text)
     text = replace_answers_array(text)
+    text = ensure_answers_binding(text)
     text = re.sub(r"const\s+TODAY\s*=\s*new\s+Date\(\s*['\"]2026-08-16['\"]\s*\)\s*;", 'const TODAY = AnswerOSData.today();', text)
     text = re.sub(r"const\s+todayStr\s*=\s*['\"]2026-08-16['\"]\s*;", "const todayStr = AnswerOSData.formatDate(AnswerOSData.today());", text)
+    if path.name == 'answeros-dashboard.html':
+        text = patch_dashboard(text)
+    elif path.name == 'answeros-all-answers.html':
+        text = patch_all_answers(text)
     bootstrap = '''\n<script>\n// AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.\nAnswerOSData.initPage({reloadOnChange:true});\n</script>\n'''
     if 'AnswerOSData.initPage({reloadOnChange:true});' not in text:
         text = text.replace('</body>', bootstrap + '</body>', 1)
