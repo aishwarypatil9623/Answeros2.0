@@ -14,8 +14,61 @@
   function parseList(value){if(!value)return [];return String(value).split(/\r?\n+/).map(s=>s.trim()).map(s=>s.replace(/^(?:[-•*]|[✓✕❌🔼❎❗])\s*/u,'').trim()).filter(Boolean);}
   function parseDemand(value){if(!value)return [];return String(value).split(/\r?\n+/).map(s=>s.trim()).filter(Boolean).map(text=>{const m=text.match(/^([✓❌✕🔼!])\s*(.*)$/u);const marker=m?m[1]:'';const clean=(m?m[2]:text).trim();let status='partial';if(marker==='✓')status='done';else if(marker==='❌'||marker==='✕')status='missing';return {status,text:clean};});}
   function parseImprovements(value){return parseList(value).map(text=>{const parts=text.split(/\s*→\s*/);return parts.length>1?{issue:parts[0].trim(),fix:parts.slice(1).join(' → ').trim()}:{issue:text,fix:text};});}
+  function parseOverallFeedback(value){
+    const text=String(value||'').trim();
+    if(!text)return {strength:'',gap:'',fix:''};
+    const clean=s=>String(s||'').trim().replace(/^[-–—:]+\s*/,'').trim();
+    const strength=text.match(/(?:^|\n)\s*(?:Strength|Strengths)\s*:\s*(.*?)(?=\n\s*(?:Gap|Gaps|Fix|Improvements?)\s*:|$)/is);
+    const gap=text.match(/(?:^|\n)\s*(?:Gap|Gaps|Improvements?)\s*:\s*(.*?)(?=\n\s*(?:Strength|Strengths|Fix)\s*:|$)/is);
+    const fix=text.match(/(?:^|\n)\s*Fix\s*:\s*(.*?)(?=\n\s*(?:Strength|Strengths|Gap|Gaps|Improvements?)\s*:|$)/is);
+    return {strength:clean(strength?strength[1]:''),gap:clean(gap?gap[1]:''),fix:clean(fix?fix[1]:'')};
+  }
   function deriveGapCategory(row){const text=[row['Missing / Extra Improvements'],row['Overall Feedback'],row['My One Learning']].filter(Boolean).join(' ').toLowerCase();if(/example|data|quantif|statistic/.test(text))return 'Examples & Data';if(/judgment|article|constitutional|legal|statut/.test(text))return 'Legal/Institutional Backing';if(/analysis|analytical|critical|depth|causal/.test(text))return 'Critical Analysis';if(/directive|demand/.test(text))return 'Demand/Directive';if(/intro/.test(text))return 'Introduction';if(/conclusion/.test(text))return 'Conclusion';if(/technical|scientific|mechanism/.test(text))return 'Technical Precision';return 'Content/Depth';}
-  function normalizeRow(row,index){row=row||{};const date=toDateString(row['Question Date']);const marks=toNumber(row['Marks']);const max=toNumber(row['Max Marks']);const demandPctRaw=toNumber(row['% of Demand Addressed']);const demandItems=parseDemand(row['Demand of the Question']);const improvements=parseImprovements(row['Missing / Extra Improvements']);return Object.assign({},row,{id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),date,paper:normalizePaper(row.Paper),subject:String(row.Subject||'').trim(),subtopic:String(row.Subtopic||'').trim(),directive:String(row.Directive||'').trim(),marks,max,demandPct:demandPctRaw==null?null:(demandPctRaw<=1?demandPctRaw*100:demandPctRaw),wordCount:toNumber(row['Word Count']),question:String(row.Question||'').trim(),status:String(row.Status||'').trim(),gapCategory:deriveGapCategory(row),demand:demandItems,bestIntro:String(row['Best Introduction']||'').trim(),idealSubheadings:parseList(row['Ideal Subheadings']),mustHavePoints:parseList(row['Must-Have Points']),valueAdditions:parseList(row['Value Additions']),keywords:parseList(row['Essential Keywords']),examples:parseList(row['Examples/Data']),bestConclusion:String(row['Best Conclusion']||'').trim(),improvements,topperEdge:String(row['Topper Edge']||'').trim(),learning:String(row['My One Learning']||'').trim(),feedback:{strength:String(row['Overall Feedback']||'').trim(),gap:String(row['Missing / Extra Improvements']||'').trim(),fix:String(row['My One Learning']||'').trim()}});}
+  function normalizeRow(row,index){
+    row=row||{};
+    const date=toDateString(row['Question Date']);
+    const marks=toNumber(row['Marks']);
+    const max=toNumber(row['Max Marks']);
+    const demandPctRaw=toNumber(row['% of Demand Addressed']);
+    const demandPct=demandPctRaw==null?null:Math.round((demandPctRaw<=1?demandPctRaw*100:demandPctRaw)*10)/10;
+    const demandItems=parseDemand(row['Demand of the Question']);
+    const improvements=parseImprovements(row['Missing / Extra Improvements']);
+    const parsedFeedback=parseOverallFeedback(row['Overall Feedback']);
+    return Object.assign({},row,{
+      id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
+      date,
+      paper:normalizePaper(row.Paper),
+      subject:String(row.Subject||'').trim(),
+      subtopic:String(row.Subtopic||'').trim(),
+      directive:String(row.Directive||'').trim(),
+      marks,
+      max,
+      demandPct,
+      wordCount:toNumber(row['Word Count']),
+      question:String(row.Question||'').trim(),
+      status:String(row.Status||'').trim(),
+      gapCategory:deriveGapCategory(row),
+      demand:demandItems,
+      bestIntro:String(row['Best Introduction']||'').trim(),
+      idealSubheadings:parseList(row['Ideal Subheadings']),
+      mustHavePoints:parseList(row['Must-Have Points']),
+      valueAdditions:parseList(row['Value Additions']),
+      keywords:parseList(row['Essential Keywords']),
+      examples:parseList(row['Examples/Data']),
+      bestConclusion:String(row['Best Conclusion']||'').trim(),
+      improvements,
+      topperEdge:String(row['Topper Edge']||'').trim(),
+      learning:String(row['My One Learning']||'').trim(),
+      pdfLink:String(row['PDF Link']||'').trim(),
+      pdfId:String(row['PDF ID']||'').trim(),
+      pdfDate:date,
+      feedback:{
+        strength:parsedFeedback.strength || String(row['Overall Feedback']||'').trim(),
+        gap:parsedFeedback.gap || String(row['Missing / Extra Improvements']||'').trim(),
+        fix:parsedFeedback.fix || String(row['My One Learning']||'').trim()
+      }
+    });
+  }
   function normalizeRows(rows){return (Array.isArray(rows)?rows:[]).map(normalizeRow).filter(r=>r.date||r.question||r.subject).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
   function stableHash(value){const text=JSON.stringify(value);let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16);}
   function getAnswers(){const cached=readJSON(STORAGE.answers,null);if(Array.isArray(cached))return cached;if(Array.isArray(window.AnswerOSInitialData))return normalizeRows(window.AnswerOSInitialData);return [];}
