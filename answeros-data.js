@@ -110,7 +110,10 @@
   }
 
   function getAnswers() {
-    return readJSON(STORAGE.answers, []);
+    const cached = readJSON(STORAGE.answers, null);
+    if (Array.isArray(cached)) return cached;
+    if (Array.isArray(window.AnswerOSInitialData)) return normalizeRows(window.AnswerOSInitialData);
+    return [];
   }
 
   function getLastSync() {
