@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="answeros-initial-data.js"></script>
+<script src="answeros-data.js"></script>
 <meta charset="UTF-8" />
 <title>AnswerOS — PYQ Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -459,6 +461,11 @@ function renderDueStrip(){
 }
 
 render();
+</script>
+
+<script>
+// AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.
+AnswerOSData.initPage({reloadOnChange:true});
 </script>
 </body>
 </html>
