@@ -17,11 +17,19 @@
   function parseOverallFeedback(value){
     const text=String(value||'').trim();
     if(!text)return {strength:'',gap:'',fix:''};
-    const clean=s=>String(s||'').trim().replace(/^[-–—:]+\s*/,'').trim();
-    const strength=text.match(/(?:^|\n)\s*(?:Strength|Strengths)\s*:\s*(.*?)(?=\n\s*(?:Gap|Gaps|Fix|Improvements?)\s*:|$)/is);
-    const gap=text.match(/(?:^|\n)\s*(?:Gap|Gaps|Improvements?)\s*:\s*(.*?)(?=\n\s*(?:Strength|Strengths|Fix)\s*:|$)/is);
-    const fix=text.match(/(?:^|\n)\s*Fix\s*:\s*(.*?)(?=\n\s*(?:Strength|Strengths|Gap|Gaps|Improvements?)\s*:|$)/is);
-    return {strength:clean(strength?strength[1]:''),gap:clean(gap?gap[1]:''),fix:clean(fix?fix[1]:'')};
+    const clean=s=>String(s||'').trim().replace(/^[-–—:\s]+/,'').trim();
+    // Handles both newline-separated and inline formats such as "- Strength: ... - Gap: ... - Fix: ...".
+    const normalize=s=>String(s||'').replace(/\s+/g,' ').trim();
+    const extract=(label,nextLabels)=>{
+      const next=nextLabels.join('|');
+      const re=new RegExp(`(?:^|[\\n•])\\s*[-–—]?\\s*${label}\\s*:\\s*(.*?)(?=\\s+[-–—]?\\s*(?:${next})\\s*:|$)`, 'is');
+      const m=text.match(re); return m?clean(normalize(m[1])):'';
+    };
+    return {
+      strength:extract('Strength(?:s)?',['Gap','Gaps','Fix','Improvements']),
+      gap:extract('Gap(?:s)?|Improvements?',['Strength','Strengths','Fix']),
+      fix:extract('Fix',['Strength','Strengths','Gap','Gaps','Improvements'])
+    };
   }
   function deriveGapCategory(row){const text=[row['Missing / Extra Improvements'],row['Overall Feedback'],row['My One Learning']].filter(Boolean).join(' ').toLowerCase();if(/example|data|quantif|statistic/.test(text))return 'Examples & Data';if(/judgment|article|constitutional|legal|statut/.test(text))return 'Legal/Institutional Backing';if(/analysis|analytical|critical|depth|causal/.test(text))return 'Critical Analysis';if(/directive|demand/.test(text))return 'Demand/Directive';if(/intro/.test(text))return 'Introduction';if(/conclusion/.test(text))return 'Conclusion';if(/technical|scientific|mechanism/.test(text))return 'Technical Precision';return 'Content/Depth';}
   function normalizeRow(row,index){
@@ -29,11 +37,14 @@
     const date=toDateString(row['Question Date']);
     const marks=toNumber(row['Marks']);
     const max=toNumber(row['Max Marks']);
+    const score=(marks!=null&&max>0)?Math.round((marks/max*10)*10)/10:null;
     const demandPctRaw=toNumber(row['% of Demand Addressed']);
     const demandPct=demandPctRaw==null?null:Math.round((demandPctRaw<=1?demandPctRaw*100:demandPctRaw)*10)/10;
     const demandItems=parseDemand(row['Demand of the Question']);
     const improvements=parseImprovements(row['Missing / Extra Improvements']);
     const parsedFeedback=parseOverallFeedback(row['Overall Feedback']);
+    const pdfLink=String(row['PDF Link']||'').trim();
+    const pdfId=String(row['PDF ID']||'').trim();
     return Object.assign({},row,{
       id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
       date,
@@ -43,6 +54,8 @@
       directive:String(row.Directive||'').trim(),
       marks,
       max,
+      score,
+      score10:score,
       demandPct,
       wordCount:toNumber(row['Word Count']),
       question:String(row.Question||'').trim(),
@@ -59,13 +72,15 @@
       improvements,
       topperEdge:String(row['Topper Edge']||'').trim(),
       learning:String(row['My One Learning']||'').trim(),
-      pdfLink:String(row['PDF Link']||'').trim(),
-      pdfId:String(row['PDF ID']||'').trim(),
+      pdfLink,
+      pdfId,
+      pdf:pdfLink,
+      pdfUrl:pdfLink,
       pdfDate:date,
       feedback:{
-        strength:parsedFeedback.strength || String(row['Overall Feedback']||'').trim(),
-        gap:parsedFeedback.gap || String(row['Missing / Extra Improvements']||'').trim(),
-        fix:parsedFeedback.fix || String(row['My One Learning']||'').trim()
+        strength:parsedFeedback.strength || '',
+        gap:parsedFeedback.gap || '',
+        fix:parsedFeedback.fix || ''
       }
     });
   }
