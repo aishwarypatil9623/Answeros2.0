@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnswerOS — Your UPSC Journey</title>
+<script src="answeros-initial-data.js"></script>
+<script src="answeros-data.js"></script>
+<style>
+:root{--bg:#f6f8f6;--card:#fff;--ink:#17201a;--muted:#6b756e;--line:#e4e9e5;--green:#237a43;--green2:#49a86a;--greenSoft:#e7f4ea;--purple:#7657d9;--night:#182333;--gold:#e4a83b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,-apple-system,BlinkMacSystemFont,sans-serif}.page{min-height:100vh;padding:28px}.top{max-width:1380px;margin:auto;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--green);text-transform:uppercase}.title{font-size:30px;font-weight:800;letter-spacing:-.03em;margin:5px 0}.sub{color:var(--muted);font-size:14px}.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:125px}.stat small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;font-weight:700}.stat b{display:block;font-size:18px;margin-top:2px}.shell{max-width:1380px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}.journey{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:linear-gradient(#8aa4c0 0%,#d9b5a1 27%,#e6c49b 42%,#829a7c 43%,#496d53 100%);min-height:720px;box-shadow:0 8px 30px rgba(30,45,35,.08)}.journey:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 23%,rgba(255,247,211,.8) 0 2%,transparent 2.5%),radial-gradient(circle at 82% 17%,rgba(255,247,211,.65) 0 1.5%,transparent 2%),linear-gradient(180deg,rgba(255,255,255,.16),transparent 35%);pointer-events:none}.sun{position:absolute;width:90px;height:90px;border-radius:50%;background:#fff0bf;right:15%;top:11%;filter:blur(1px);opacity:.8}.mountain{position:absolute;bottom:36%;width:0;height:0;border-left:260px solid transparent;border-right:260px solid transparent;border-bottom:390px solid #3d5570;left:42%;transform:translateX(-50%);opacity:.95}.mountain:after{content:"";position:absolute;left:-95px;top:10px;border-left:95px solid transparent;border-right:95px solid transparent;border-bottom:135px solid #edf0e8}.mountain.back{left:20%;bottom:39%;border-left-width:210px;border-right-width:210px;border-bottom-width:290px;border-bottom-color:#60758a;opacity:.75}.mountain.back:after{left:-65px;top:35px;border-left-width:65px;border-right-width:65px;border-bottom-width:95px}.ground{position:absolute;left:-5%;right:-5%;bottom:-18%;height:54%;border-radius:50% 50% 0 0/18% 18% 0 0;background:linear-gradient(180deg,#5d7d5d,#304e39)}.river{position:absolute;bottom:0;left:35%;width:18%;height:48%;background:linear-gradient(120deg,transparent 0 38%,rgba(137,197,209,.8) 39% 49%,transparent 50%);transform:rotate(7deg);opacity:.8}.trail{position:absolute;inset:0}.trail svg{width:100%;height:100%;display:block}.path-base{fill:none;stroke:rgba(255,249,225,.45);stroke-width:14;stroke-linecap:round}.path-glow{fill:none;stroke:#fff7d8;stroke-width:5;stroke-linecap:round;stroke-dasharray:2 18}.milestone{fill:#fff;stroke:var(--green);stroke-width:5}.milestone.locked{stroke:#8a8f8b;fill:#eef0ed}.label{font-size:15px;font-weight:800;fill:#18251c}.labelSmall{font-size:12px;fill:#536057}.tagBox{fill:rgba(255,255,255,.94);stroke:rgba(255,255,255,.5)}.current{filter:drop-shadow(0 4px 5px rgba(0,0,0,.22))}.hero{position:absolute;z-index:5;left:0;top:0;width:62px;height:100px;pointer-events:none;transform-origin:50% 90%}.hero .body{position:absolute;left:22px;top:28px;width:20px;height:35px;border-radius:9px 9px 7px 7px;background:#304f3b}.hero .head{position:absolute;left:25px;top:14px;width:16px;height:16px;border-radius:50%;background:#d99a72}.hero .pack{position:absolute;left:15px;top:30px;width:12px;height:27px;border-radius:7px;background:#b66f4e}.limb{position:absolute;width:5px;border-radius:5px;background:#26342c;transform-origin:top center}.armL{left:21px;top:34px;height:25px;transform:rotate(28deg)}.armR{left:39px;top:34px;height:25px;transform:rotate(-28deg)}.legL{left:24px;top:58px;height:30px;transform:rotate(15deg)}.legR{left:35px;top:58px;height:30px;transform:rotate(-15deg)}.hero.walk .armL{animation:armL .38s infinite alternate ease-in-out}.hero.walk .armR{animation:armR .38s infinite alternate ease-in-out}.hero.walk .legL{animation:legL .38s infinite alternate ease-in-out}.hero.walk .legR{animation:legR .38s infinite alternate ease-in-out}.hero.walk{animation:bob .19s infinite alternate ease-in-out}@keyframes armL{to{transform:rotate(-30deg)}}@keyframes armR{to{transform:rotate(30deg)}}@keyframes legL{to{transform:rotate(-25deg)}}@keyframes legR{to{transform:rotate(25deg)}}@keyframes bob{to{margin-top:-3px}}.side{display:flex;flex-direction:column;gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 20px rgba(30,45,35,.05)}.card h3{margin:0 0 14px;font-size:14px}.bigProgress{font-size:34px;font-weight:850;letter-spacing:-.04em}.bar{height:9px;background:#e6ebe7;border-radius:10px;overflow:hidden;margin:10px 0}.bar>div{height:100%;background:linear-gradient(90deg,var(--green),var(--green2));border-radius:10px;width:0;transition:width 1s ease}.remaining{color:var(--muted);font-size:12px}.milestones{display:flex;flex-direction:column;gap:9px}.mrow{display:grid;grid-template-columns:28px 1fr auto;gap:9px;align-items:center;font-size:12px}.micon{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--greenSoft);color:var(--green);font-weight:800}.mrow.locked .micon{background:#f0f2f0;color:#8a908b}.mname{font-weight:700}.mcount{color:var(--muted);font-size:10px}.check{color:var(--green);font-weight:800}.footer{max-width:1380px;margin:14px auto 0;color:var(--muted);font-size:11px;display:flex;justify-content:space-between}.refresh{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;font-weight:700;color:var(--green);cursor:pointer}.refresh:active{transform:translateY(1px)}@media(max-width:900px){.shell{grid-template-columns:1fr}.journey{min-height:600px}.top{align-items:flex-start;flex-direction:column}}@media(prefers-reduced-motion:reduce){.hero.walk,.hero.walk .limb,.bar>div{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div><div class="eyebrow">AnswerOS · Journey</div><div class="title">Your UPSC Journey</div><div class="sub">Every answer moves you closer to the summit.</div></div>
+    <div class="stats"><div class="stat"><small>Answers</small><b id="answerCount">0 / 3000</b></div><div class="stat"><small>Journey</small><b id="pct">0%</b></div><div class="stat"><small>Streak</small><b id="streak">—</b></div></div>
+  </header>
+  <main class="shell">
+    <section class="journey" aria-label="Animated UPSC journey map">
+      <div class="sun"></div><div class="mountain back"></div><div class="mountain"></div><div class="river"></div><div class="ground"></div>
+      <div class="trail">
+        <svg viewBox="0 0 1000 720" preserveAspectRatio="none" aria-hidden="true">
+          <path id="journeyPath" class="path-base" d="M90 620 C180 600 150 535 270 525 C390 515 310 445 445 420 C570 395 470 330 590 305 C710 280 615 220 730 185 C820 158 790 105 885 72"/>
+          <path class="path-glow" d="M90 620 C180 600 150 535 270 525 C390 515 310 445 445 420 C570 395 470 330 590 305 C710 280 615 220 730 185 C820 158 790 105 885 72"/>
+          <g><circle class="milestone" cx="90" cy="620" r="12"/><rect class="tagBox" x="110" y="588" rx="9" width="125" height="50"/><text class="label" x="122" y="610">START</text><text class="labelSmall" x="122" y="627">The beginning</text></g>
+          <g><circle class="milestone" cx="270" cy="525" r="12"/><rect class="tagBox" x="286" y="493" rx="9" width="145" height="50"/><text class="label" x="298" y="515">FIRST CAMP</text><text class="labelSmall" x="298" y="532">100 answers</text></g>
+          <g><circle class="milestone" cx="445" cy="420" r="12"/><rect class="tagBox" x="460" y="388" rx="9" width="135" height="50"/><text class="label" x="472" y="410">THE TRAIL</text><text class="labelSmall" x="472" y="427">500 answers</text></g>
+          <g><circle class="milestone" cx="590" cy="305" r="12"/><rect class="tagBox" x="606" y="273" rx="9" width="150" height="50"/><text class="label" x="618" y="295">BASE CAMP</text><text class="labelSmall" x="618" y="312">1,000 answers</text></g>
+          <g><circle class="milestone" cx="730" cy="185" r="12"/><rect class="tagBox" x="746" y="153" rx="9" width="145" height="50"/><text class="label" x="758" y="175">FINAL ASCENT</text><text class="labelSmall" x="758" y="192">2,500 answers</text></g>
+          <g><circle class="milestone" cx="885" cy="72" r="14"/><rect class="tagBox" x="720" y="28" rx="9" width="155" height="50"/><text class="label" x="732" y="50">THE SUMMIT</text><text class="labelSmall" x="732" y="67">3,000 answers</text></g>
+        </svg>
+      </div>
+      <div id="hero" class="hero" aria-label="Your journey character"><div class="pack"></div><div class="head"></div><div class="body"></div><div class="limb armL"></div><div class="limb armR"></div><div class="limb legL"></div><div class="limb legR"></div></div>
+    </section>
+    <aside class="side">
+      <section class="card"><h3>Journey Progress</h3><div class="bigProgress"><span id="bigCount">0</span> <span style="font-size:16px;color:var(--muted)">/ 3,000</span></div><div class="bar"><div id="bar"></div></div><div class="remaining" id="remaining">3,000 answers to the summit</div></section>
+      <section class="card"><h3>Milestones</h3><div class="milestones" id="milestones"></div></section>
+      <section class="card"><h3>Live data</h3><div style="font-size:12px;color:var(--muted);line-height:1.55">This page reads the same AnswerOS data layer as the dashboard. Use <b>Refresh from Sheet</b> on the dashboard or the button below after adding answers.</div><button class="refresh" id="refreshBtn" type="button" style="margin-top:12px">Refresh data</button><div id="syncStatus" style="font-size:10px;color:var(--muted);margin-top:8px">Waiting for sync…</div></section>
+    </aside>
+  </main>
+  <div class="footer"><span>Target: 3,000 answers · Data-driven movement</span><span id="lastSync"></span></div>
+</div>
+<script>
+(function(){
+  'use strict';
+  const TARGET=3000, LAST_KEY='answeros_journey_last_seen_v1';
+  const milestones=[{n:100,name:'First Camp'},{n:500,name:'The Trail'},{n:1000,name:'Base Camp'},{n:1500,name:'The Climb'},{n:2000,name:'High Altitude'},{n:2500,name:'Final Ascent'},{n:3000,name:'The Summit'}];
+  const hero=document.getElementById('hero'), path=document.getElementById('journeyPath');
+  const svg=path.ownerSVGElement, viewBox=svg.viewBox.baseVal;
+  let current=0, animFrame=0;
+  function clamp(n){return Math.max(0,Math.min(TARGET,Number.isFinite(n)?n:0));}
+  function getData(){
+    const rows=(window.AnswerOSData&&typeof AnswerOSData.getAnswers==='function')?AnswerOSData.getAnswers():[];
+    const count=Array.isArray(rows)?rows.length:0;
+    let streak='—';
+    const dates=Array.from(new Set(rows.map(r=>r&&r.date).filter(Boolean))).sort().reverse();
+    if(dates.length){let d=new Date();let streakN=0;for(let i=0;i<dates.length;i++){const expected=new Date(d);expected.setDate(d.getDate()-i);const key=expected.toISOString().slice(0,10);if(dates.includes(key))streakN++;else if(i===0){}else break}streak=streakN?String(streakN):'0';}
+    return {count:clamp(count),streak};
+  }
+  function pointForCount(n){const ratio=clamp(n)/TARGET;return path.getPointAtLength(path.getTotalLength()*ratio);}
+  function place(n){const p=pointForCount(n);const scaleX=svg.clientWidth/viewBox.width,scaleY=svg.clientHeight/viewBox.height;hero.style.left=(p.x*scaleX-31)+'px';hero.style.top=(p.y*scaleY-88)+'px';}
+  function renderMilestones(n){
+    const el=document.getElementById('milestones');el.innerHTML='';
+    milestones.forEach(m=>{const done=n>=m.n;const row=document.createElement('div');row.className='mrow'+(done?'':' locked');row.innerHTML='<div class="micon">'+(done?'✓':'•')+'</div><div><div class="mname">'+m.name+'</div><div class="mcount">'+m.n.toLocaleString()+' answers</div></div><div class="check">'+(done?'Done':'Locked')+'</div>';el.appendChild(row);});
+  }
+  function updateNumbers(n,streak){const pct=(n/TARGET*100);document.getElementById('answerCount').textContent=n.toLocaleString()+' / 3,000';document.getElementById('bigCount').textContent=n.toLocaleString();document.getElementById('pct').textContent=pct.toFixed(1).replace('.0','')+'%';document.getElementById('bar').style.width=pct+'%';document.getElementById('remaining').textContent=n>=TARGET?'You reached the summit.':' '+(TARGET-n).toLocaleString()+' answers to the summit';document.getElementById('streak').textContent=streak==='—'?'—':streak+' days';renderMilestones(n);}
+  function animate(from,to,duration){cancelAnimationFrame(animFrame);from=clamp(from);to=clamp(to);const delta=Math.abs(to-from);if(delta===0){place(to);hero.classList.remove('walk');return Promise.resolve();}hero.classList.add('walk');const start=performance.now();return new Promise(resolve=>{function tick(now){const t=Math.min(1,(now-start)/duration);const eased=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;const n=from+(to-from)*eased;place(n);if(t<1)animFrame=requestAnimationFrame(tick);else{hero.classList.remove('walk');place(to);resolve();}}animFrame=requestAnimationFrame(tick);});}
+  async function refresh(animateChange){
+    const data=getData();const previous=clamp(Number(localStorage.getItem(LAST_KEY)));const from=animateChange&&Number.isFinite(previous)?previous:data.count;
+    updateNumbers(data.count,data.streak);
+    if(animateChange&&Math.abs(data.count-from)>0){await animate(from,data.count,Math.min(5000,900+Math.abs(data.count-from)*25));}
+    else place(data.count);
+    localStorage.setItem(LAST_KEY,String(data.count));
+    const synced=window.AnswerOSData&&AnswerOSData.getLastSync?AnswerOSData.getLastSync():'';document.getElementById('lastSync').textContent=synced?'Last sync: '+new Date(synced).toLocaleString():'';document.getElementById('syncStatus').textContent=synced?'Synced '+new Date(synced).toLocaleTimeString():'Using cached data';
+  }
+  document.getElementById('refreshBtn').addEventListener('click',async()=>{const btn=document.getElementById('refreshBtn');btn.disabled=true;btn.textContent='Syncing…';try{if(window.AnswerOSData&&AnswerOSData.sync)await AnswerOSData.sync({reloadOnChange:false});await refresh(true);}catch(e){document.getElementById('syncStatus').textContent='Sync failed; showing cached data';await refresh(true);}finally{btn.disabled=false;btn.textContent='Refresh data';}});
+  window.addEventListener('answeros:data-updated',()=>refresh(true));
+  refresh(false);
+  if(window.AnswerOSData&&AnswerOSData.getConfig&&AnswerOSData.getConfig().autoSyncEnabled){setInterval(()=>{if(AnswerOSData.sync)AnswerOSData.sync({reloadOnChange:false}).catch(()=>{});},Math.max(5,Number(AnswerOSData.getConfig().syncIntervalMinutes)||30)*60000);}
+  window.addEventListener('resize',()=>place(current));
+  current=clamp(getData().count);place(current);
+})();
+</script>
+</body>
+</html>
