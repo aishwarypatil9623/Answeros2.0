@@ -155,18 +155,18 @@
 
   /* Quick stats strip */
   .quickstats{
-    display:grid;grid-template-columns:repeat(7,1fr);gap:0;
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden;
+    display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;
   }
-  .qs-title{grid-column:1/-1;font-size:13px;font-weight:700;padding:14px 18px 4px 18px;}
-  .qs-item{padding:8px 14px 16px 14px;border-right:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;}
-  .qs-item:last-child{border-right:none;}
-  .qs-icon{width:28px;height:28px;border-radius:8px;background:var(--green-50);color:var(--green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-  .qs-icon svg{width:15px;height:15px;}
-  .qs-val{font-size:18px;font-weight:800;line-height:1.1;letter-spacing:-0.02em;}
-  .qs-val span{font-size:11px;font-weight:600;color:var(--ink-400,#9aa0a5);}
-  .qs-label{font-size:10.5px;color:var(--ink-500);margin-top:2px;white-space:nowrap;}
+  .qs-chip{
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:7px 12px 7px 8px;box-shadow:var(--shadow);
+  }
+  .qs-icon{width:24px;height:24px;border-radius:7px;background:var(--green-50);color:var(--green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .qs-icon svg{width:13px;height:13px;}
+  .qs-val{font-size:14px;font-weight:800;line-height:1;letter-spacing:-0.01em;white-space:nowrap;}
+  .qs-val span{font-size:10px;font-weight:600;color:var(--ink-400,#9aa0a5);margin-left:1px;}
+  .qs-label{font-size:9.5px;color:var(--ink-500);white-space:nowrap;margin-top:1px;}
 
   .grid3{display:grid;grid-template-columns: 1.3fr 1.3fr 1.15fr;gap:16px;margin-bottom:16px;align-items:stretch;}
   .grid3b{display:grid;grid-template-columns: 1.3fr 1.3fr 1fr;gap:16px;margin-bottom:16px;}
@@ -235,10 +235,13 @@
   .stat-mini .slabel{flex:1;color:var(--ink-700);}
   .stat-mini .sval{font-weight:700;}
 
-  .kpi-box{display:flex;flex-direction:column;align-items:center;text-align:center;padding:12px 6px;background:var(--green-50);border-radius:10px;}
-  .kpi-box svg{width:16px;height:16px;color:var(--green-700);margin-bottom:4px;}
-  .kpi-box .kval{font-size:15px;font-weight:800;}
-  .kpi-box .klabel{font-size:10px;color:var(--ink-500);margin-top:2px;}
+  .kpi-box{display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px 8px 12px 8px;background:#fff;border:1px solid var(--line);border-radius:12px;transition:transform .12s ease, box-shadow .12s ease;}
+  .kpi-box:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+  .kpi-icon-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+  .kpi-icon-circle svg{width:15px;height:15px;}
+  .kpi-box .kval{font-size:17px;font-weight:800;letter-spacing:-0.01em;line-height:1;}
+  .kpi-box .klabel{font-size:9px;color:var(--ink-500);margin-top:5px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+  .kpi-box .ksub{font-size:11px;color:var(--ink-700);font-weight:600;margin-top:3px;line-height:1.3;}
 
   .focus-headline{font-size:26px;font-weight:800;color:#b3402c;letter-spacing:-0.02em;}
   .focus-headline span{font-size:13px;font-weight:600;color:var(--ink-500);}
@@ -328,6 +331,7 @@
     </div>
 
     <!-- Quick Stats -->
+    <div style="font-size:12.5px;font-weight:700;color:var(--ink-700);margin:2px 0 8px 2px;">Quick Stats</div>
     <div class="quickstats" id="quickStats"></div>
 
     <!-- Row: Subject Distribution / Score Trend / Recent Answers -->
@@ -346,7 +350,12 @@
       <section class="card">
         <div class="card-head">
           <h3>Score Trend</h3>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <select id="trendTypeFilter" class="dropdown" style="font-family:inherit;font-size:11.5px;appearance:none;background:#fff;">
+              <option value="all">10M + 15M</option>
+              <option value="10">10-Mark Only</option>
+              <option value="15">15-Mark Only</option>
+            </select>
             <select id="trendSubjFilter" class="dropdown" style="font-family:inherit;font-size:11.5px;appearance:none;background:#fff;">
               <option value="all">All Subjects</option>
             </select>
@@ -408,11 +417,15 @@
       <section class="card">
         <div class="card-head">
           <h3>Score Improvement</h3>
-          <span style="font-size:11px;color:var(--ink-500);font-weight:600;">Last 4 weeks</span>
+          <select id="improvePeriod" class="dropdown" style="font-family:inherit;font-size:11px;appearance:none;background:#fff;">
+            <option value="4">Last 4 Weeks</option>
+            <option value="8">Last 8 Weeks</option>
+            <option value="all">All Weeks</option>
+          </select>
         </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">
           <div style="font-size:24px;font-weight:800;color:var(--green-700);" id="improveVal">—</div>
-          <div style="font-size:11.5px;color:var(--ink-500);">Improvement in last 30 days</div>
+          <div style="font-size:11.5px;color:var(--ink-500);" id="improveSub">vs first week shown</div>
         </div>
         <canvas id="improveBar" height="150"></canvas>
       </section>
@@ -553,12 +566,27 @@ const ANSWERS = AnswerOSData.getAnswers();
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
 const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3'};
 
-/* ---------- derived stats ---------- */
+/* ---------- derived stats (percentage scale: marks/max*100) ---------- */
 const totalAnswers = ANSWERS.length;
-const avgScore = (ANSWERS.reduce((s,a)=>s+(a.marks/a.max*10),0)/totalAnswers);
-const bestScore = Math.max(...ANSWERS.map(a=>a.marks/a.max*10));
-const worstScore = Math.min(...ANSWERS.map(a=>a.marks/a.max*10));
+const avgScore = (ANSWERS.reduce((s,a)=>s+(a.marks/a.max*100),0)/totalAnswers);
+const bestScore = Math.max(...ANSWERS.map(a=>a.marks/a.max*100));
+const worstScore = Math.min(...ANSWERS.map(a=>a.marks/a.max*100));
 const avgDemand = Math.round(ANSWERS.reduce((s,a)=>s+a.demand,0)/totalAnswers);
+
+/* ---------- 10-mark vs 15-mark split (answer-type breakdown) ---------- */
+const WORD_LIMIT_BY_TYPE = {10:150, 15:250}; // standard UPSC Mains word limits
+function answersOfType(maxMarks){ return ANSWERS.filter(a=>a.max===maxMarks); }
+function typeStats(maxMarks){
+  const rows = answersOfType(maxMarks);
+  if(!rows.length) return null;
+  const avg = rows.reduce((s,a)=>s+(a.marks/a.max*100),0)/rows.length;
+  const wordCounts = rows.map(a=>a.wordCount).filter(w=>w!=null && !isNaN(w));
+  const avgWords = wordCounts.length ? Math.round(wordCounts.reduce((s,w)=>s+w,0)/wordCounts.length) : null;
+  const avgDem = Math.round(rows.reduce((s,a)=>s+(a.demand||0),0)/rows.length);
+  return {n:rows.length, avg, avgWords, avgDem, limit:WORD_LIMIT_BY_TYPE[maxMarks]};
+}
+const stats10 = typeStats(10);
+const stats15 = typeStats(15);
 function computeStreaks(){
   const uniqueDates = [...new Set(ANSWERS.map(a=>a.date))].sort();
   let longest=1, cur=1;
@@ -598,22 +626,27 @@ if(currentStreak > 0) document.getElementById('icStreak').classList.add('pulse')
   document.getElementById('todayGoalBar').style.width = pct+'%';
 })();
 
-/* ---------- quick stats strip ---------- */
+/* ---------- quick stats strip (compact chips, percentage scale) ---------- */
+const words10Over = stats10 && stats10.avgWords!=null && stats10.avgWords > stats10.limit;
+const words15Over = stats15 && stats15.avgWords!=null && stats15.avgWords > stats15.limit;
 const qsData = [
-  ['file',totalAnswers,'','Total Answers','All Time'],
-  ['fire',currentStreak,'','Current Streak','Days'],
-  ['trophy',longestStreak,'','Longest Streak','Days'],
-  ['star',avgScore.toFixed(1),'/10','Average Score','Marks'],
-  ['clock',avgDemand,'%','Avg Demand Addressed',''],
-  ['up',bestScore.toFixed(1),'/10','Best Score','Marks'],
-  ['down',worstScore.toFixed(1),'/10','Worst Score','Marks'],
+  ['file',totalAnswers,'','Total Answers'],
+  ['fire',currentStreak,'','Streak (Days)'],
+  ['trophy',longestStreak,'','Best Streak'],
+  ['star',avgScore.toFixed(0),'%','Avg Score'],
+  ['clock',avgDemand,'%','Avg Demand'],
+  ['up',bestScore.toFixed(0),'%','Best Score'],
+  ['down',worstScore.toFixed(0),'%','Worst Score'],
+  ['star10',stats10?stats10.avg.toFixed(0):'—','%',`10M Avg${stats10?` (n=${stats10.n})`:''}`],
+  ['star15',stats15?stats15.avg.toFixed(0):'—','%',`15M Avg${stats15?` (n=${stats15.n})`:''}`],
+  ['clipboard', stats10&&stats10.avgWords!=null?`${stats10.avgWords}/${stats10.limit}`:'—','','10M Words', words10Over],
+  ['clipboard', stats15&&stats15.avgWords!=null?`${stats15.avgWords}/${stats15.limit}`:'—','','15M Words', words15Over],
 ];
-const qsIconMap = {file:'file', fire:'flame', trophy:'trophy', star:'star', clock:'clock', up:'trendUp', down:'trendDown', redo:'refresh'};
-document.getElementById('quickStats').innerHTML = `<div class="qs-title">Quick Stats</div>` +
-  qsData.map(([ic,val,unit,label,sub])=>`
-    <div class="qs-item">
-      <div class="qs-icon">${iconSVG(qsIconMap[ic], 14)}</div>
-      <div><div class="qs-val">${val}<span>${unit}</span></div><div class="qs-label">${label}${sub? ' · '+sub:''}</div></div>
+const qsIconMap = {file:'file', fire:'flame', trophy:'trophy', star:'star', star10:'star', star15:'star', clock:'clock', up:'trendUp', down:'trendDown', redo:'refresh', clipboard:'clipboard'};
+document.getElementById('quickStats').innerHTML = qsData.map(([ic,val,unit,label,warn])=>`
+    <div class="qs-chip">
+      <div class="qs-icon" ${warn?'style="background:#fbeceb;color:#c0503a;"':''}>${iconSVG(qsIconMap[ic], 12)}</div>
+      <div><div class="qs-val" ${warn?'style="color:#c0503a;"':''}>${val}<span>${unit}</span>${warn?' ⚠':''}</div><div class="qs-label">${label}</div></div>
     </div>`).join('');
 
 /* ---------- subject performance: donut (volume) + tiered legend (score) ---------- */
@@ -621,10 +654,13 @@ const subjCounts = {};
 const subjScoreSum = {};
 ANSWERS.forEach(a=>{
   subjCounts[a.paper] = (subjCounts[a.paper]||0)+1;
-  subjScoreSum[a.paper] = (subjScoreSum[a.paper]||0) + (a.marks/a.max*10);
+  subjScoreSum[a.paper] = (subjScoreSum[a.paper]||0) + (a.marks/a.max*100);
 });
 const subjLabels = Object.keys(subjCounts).sort((a,b)=> subjCounts[b]-subjCounts[a]);
-function scoreTier(s){ return s>=6.5 ? {bg:'#e6f4ea',fg:'#1c5c30'} : s>=4.5 ? {bg:'#fbf5e8',fg:'#8a6212'} : {bg:'#fbf1ee',fg:'#b3402c'}; }
+function scoreTier(s){ return s>=65 ? {bg:'#e6f4ea',fg:'#1c5c30'} : s>=45 ? {bg:'#fbf5e8',fg:'#8a6212'} : {bg:'#fbf1ee',fg:'#b3402c'}; }
+
+/* ---------- render 10-mark vs 15-mark breakdown card ---------- */
+/* type breakdown card removed — its key info now lives as compact chips in Quick Stats below */
 
 document.getElementById('totalAnswersDonut').textContent = totalAnswers;
 new Chart(document.getElementById('subjectDonut'), {
@@ -632,7 +668,7 @@ new Chart(document.getElementById('subjectDonut'), {
   data:{ labels: subjLabels, datasets:[{ data: subjLabels.map(s=>subjCounts[s]), backgroundColor: subjLabels.map(s=>SUBJECT_COLORS[s]||'#ccc'), borderWidth:3, borderColor:'#fff' }] },
   options:{ cutout:'70%', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>{
     const s = ctx.label; const avg = subjScoreSum[s]/subjCounts[s];
-    return `${s}: ${ctx.parsed} answers · avg ${avg.toFixed(1)}/10`;
+    return `${s}: ${ctx.parsed} answers · avg ${avg.toFixed(0)}%`;
   }}}}}
 });
 
@@ -651,7 +687,7 @@ document.getElementById('subjectPerf').innerHTML = subjLabels.map(s=>{
 const subjRanked = subjLabels.map(s=>({paper:s, avg: subjScoreSum[s]/subjCounts[s], n:subjCounts[s]}));
 const subjWeakest = subjRanked.slice().sort((a,b)=>a.avg-b.avg)[0];
 const subjHeaviest = subjRanked.slice().sort((a,b)=>b.n-a.n)[0];
-document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(1)}/10. Ring size = share of practice, score badge = where marks are actually landing.`;
+document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%. Ring size = share of practice, score badge = where marks are actually landing.`;
 
 /* ---------- score trend line (functional filter: range + subject) ---------- */
 const sortedAll = [...ANSWERS].sort((a,b)=> new Date(a.date)-new Date(b.date));
@@ -661,29 +697,36 @@ subjLabels.forEach(s=> trendSubjSelect.insertAdjacentHTML('beforeend', `<option 
 function renderScoreTrend(){
   const filterVal = document.getElementById('trendFilter').value;
   const subjVal = document.getElementById('trendSubjFilter').value;
-  const bySubj = subjVal==='all' ? sortedAll : sortedAll.filter(a=>a.paper===subjVal);
+  const typeVal = document.getElementById('trendTypeFilter').value;
+  let bySubj = subjVal==='all' ? sortedAll : sortedAll.filter(a=>a.paper===subjVal);
+  if(typeVal !== 'all') bySubj = bySubj.filter(a=> String(a.max) === typeVal);
   const data = filterVal==='all' ? bySubj : bySubj.slice(-parseInt(filterVal));
+  // color each point by answer type so a mixed "10M + 15M" view still shows which is which
+  const typeColor = a => a.max===10 ? '#3b6fd5' : '#2c8a46';
   const cfg = {
     type:'line',
     data:{
       labels: data.map(a=> new Date(a.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),
       datasets:[{
-        data: data.map(a=> +(a.marks/a.max*10).toFixed(1)),
+        data: data.map(a=> +(a.marks/a.max*100).toFixed(1)),
         borderColor:'#2c8a46', backgroundColor:'rgba(44,138,70,0.08)', fill:true, tension:.35,
-        pointBackgroundColor:'#2c8a46', pointRadius:3, borderWidth:2
+        pointBackgroundColor: data.map(typeColor), pointRadius:4, pointHoverRadius:6, borderWidth:2
       }]
     },
     options:{
-      plugins:{legend:{display:false}},
-      scales:{ y:{min:0,max:10, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} }
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        label:(ctx)=>{ const a = data[ctx.dataIndex]; return `${ctx.parsed.y}% · ${a.max}-Mark · ${a.paper}`; }
+      }}},
+      scales:{ y:{min:0,max:100, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} }
     }
   };
-  if(scoreTrendChart){ scoreTrendChart.data = cfg.data; scoreTrendChart.update(); }
+  if(scoreTrendChart){ scoreTrendChart.data = cfg.data; scoreTrendChart.options = cfg.options; scoreTrendChart.update(); }
   else { scoreTrendChart = new Chart(document.getElementById('scoreTrend'), cfg); }
 }
 renderScoreTrend();
 document.getElementById('trendFilter').addEventListener('change', renderScoreTrend);
 document.getElementById('trendSubjFilter').addEventListener('change', renderScoreTrend);
+document.getElementById('trendTypeFilter').addEventListener('change', renderScoreTrend);
 
 /* ---------- recent answers list (filter + sort + limit + calendar cross-filter) ---------- */
 const raSubjSelect = document.getElementById('raSubjFilter');
@@ -698,7 +741,7 @@ function renderRecent(){
   if(subjVal !== 'all') rows = rows.filter(a=>a.paper===subjVal);
   if(raDateFilter) rows = rows.filter(a=>a.date===raDateFilter);
 
-  const scoreOf = a => a.marks/a.max*10;
+  const scoreOf = a => a.marks/a.max*100;
   if(sortVal==='newest') rows.sort((a,b)=> new Date(b.date)-new Date(a.date));
   else if(sortVal==='oldest') rows.sort((a,b)=> new Date(a.date)-new Date(b.date));
   else if(sortVal==='highest') rows.sort((a,b)=> scoreOf(b)-scoreOf(a));
@@ -717,7 +760,7 @@ function renderRecent(){
 
   document.getElementById('recentEmpty').style.display = rows.length ? 'none' : 'block';
   document.getElementById('recentList').innerHTML = rows.map(a=>{
-    const score = (a.marks/a.max*10).toFixed(1);
+    const score = (a.marks/a.max*100).toFixed(0);
     const d = new Date(a.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const col = SUBJECT_COLORS[a.paper]||'#888';
     return `<div class="ra-row">
@@ -726,7 +769,7 @@ function renderRecent(){
         <div class="ra-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.subtopic}</div>
         <div class="ra-meta"><span>${d}</span><span>·</span><span>${a.subject}</span></div>
       </div>
-      <div class="ra-score">${score}<span style="color:var(--ink-500);font-weight:500;">/10</span></div>
+      <div class="ra-score">${score}<span style="color:var(--ink-500);font-weight:500;">%</span></div>
     </div>`;
   }).join('');
 }
@@ -784,31 +827,86 @@ document.getElementById('calToday').addEventListener('click', ()=>{
   const now = AnswerOSData.today(); calYear=now.getFullYear(); calMonth=now.getMonth(); renderCalendar();
 });
 
-/* ---------- score improvement bar ---------- */
-const weekLabels = ['11–20 Jul','21 Jul–1 Aug','2–9 Aug','10–15 Aug'];
-const weekBuckets = [3.2, 3.0, 4.0, 3.8]; // real weekly averages computed from ANSWERS
-new Chart(document.getElementById('improveBar'),{
-  type:'bar',
-  data:{labels:weekLabels,
-    datasets:[{data:weekBuckets, backgroundColor:['#cfe8d8','#b8dfc4','#a2d6b1','#2c8a46'], borderRadius:6, maxBarThickness:34}]},
-  options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:10,grid:{color:'#eef1ee'}}, x:{grid:{display:false}}}}
+/* ---------- score improvement bar (functional: real weekly buckets from ANSWERS) ---------- */
+function mondayOf(dateStr){
+  const d = new Date(dateStr);
+  const day = (d.getDay()+6)%7; // Mon=0
+  d.setDate(d.getDate()-day);
+  return d;
+}
+function weekKey(d){ return d.toISOString().slice(0,10); }
+function weekLabel(monday){
+  const sunday = new Date(monday); sunday.setDate(sunday.getDate()+6);
+  const fmt = (x)=> x.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  return `${fmt(monday)}–${fmt(sunday)}`;
+}
+const weekBucketMap = {};
+ANSWERS.forEach(a=>{
+  const mon = mondayOf(a.date);
+  const key = weekKey(mon);
+  if(!weekBucketMap[key]) weekBucketMap[key] = {monday:mon, scores:[]};
+  weekBucketMap[key].scores.push(a.marks/a.max*100);
 });
-document.getElementById('improveVal').textContent = (weekBuckets[weekBuckets.length-1]>=weekBuckets[0]?'+':'') + (weekBuckets[weekBuckets.length-1]-weekBuckets[0]).toFixed(1);
+const allWeeks = Object.values(weekBucketMap).sort((a,b)=> a.monday-b.monday).map(w=>({
+  label: weekLabel(w.monday),
+  avg: w.scores.reduce((s,v)=>s+v,0)/w.scores.length,
+  n: w.scores.length
+}));
+let improveChart = null;
+function renderImprovement(){
+  const periodVal = document.getElementById('improvePeriod').value;
+  const shown = periodVal==='all' ? allWeeks : allWeeks.slice(-parseInt(periodVal));
+  document.getElementById('improveSub').textContent = shown.length>1 ? `vs week of ${shown[0].label}` : 'Not enough weeks yet';
+  if(shown.length < 2){
+    document.getElementById('improveVal').textContent = '—';
+  } else {
+    const delta = Math.round(shown[shown.length-1].avg - shown[0].avg);
+    document.getElementById('improveVal').textContent = (delta>=0?'+':'') + delta + '%';
+    document.getElementById('improveVal').style.color = delta >= 0 ? 'var(--green-700)' : '#b3402c';
+  }
+  const bars = shown.map((w,i)=> i===shown.length-1 ? '#2c8a46' : '#b8dfc4');
+  const cfg = {
+    labels: shown.map(w=>w.label),
+    datasets:[{ data: shown.map(w=>+w.avg.toFixed(1)), backgroundColor:bars, borderRadius:6, maxBarThickness:34 }]
+  };
+  if(improveChart){ improveChart.data = cfg; improveChart.update(); }
+  else {
+    improveChart = new Chart(document.getElementById('improveBar'),{
+      type:'bar',
+      data:cfg,
+      options:{
+        plugins:{legend:{display:false}, tooltip:{callbacks:{
+          label:(ctx)=>{ const w = shown[ctx.dataIndex]; return `${ctx.parsed.y}% avg · ${w.n} answer${w.n>1?'s':''}`; }
+        }}},
+        scales:{y:{min:0,max:100,grid:{color:'#eef1ee'}}, x:{grid:{display:false}, ticks:{font:{size:9.5}}}}
+      }
+    });
+  }
+}
+renderImprovement();
+document.getElementById('improvePeriod').addEventListener('change', renderImprovement);
 
-/* ---------- top performance ---------- */
+/* ---------- top performance (distinct accent per stat, kpi-icon-circle) ---------- */
 const bestRow = ANSWERS.reduce((b,a)=> (a.marks/a.max) > (b.marks/b.max)? a:b);
 const bySubjAvg = {};
 subjLabels.forEach(s=>{
   const rows = ANSWERS.filter(a=>a.paper===s);
-  bySubjAvg[s] = rows.reduce((sum,a)=>sum+a.marks/a.max*10,0)/rows.length;
+  bySubjAvg[s] = rows.reduce((sum,a)=>sum+a.marks/a.max*100,0)/rows.length;
 });
 const highestAvgSubj = Object.entries(bySubjAvg).sort((a,b)=>b[1]-a[1])[0];
 const mostAnsSubj = Object.entries(subjCounts).sort((a,b)=>b[1]-a[1])[0];
-document.getElementById('topPerf').innerHTML = `
-  <div class="kpi-box">${iconSVG('trophy',20)}<div class="kval">${(bestRow.marks/bestRow.max*10).toFixed(1)}/10</div><div class="klabel">Best Score</div><div class="klabel" style="font-weight:600;color:var(--ink-700);">${bestRow.subject} ${bestRow.subtopic.split(' ').slice(0,2).join(' ')}</div></div>
-  <div class="kpi-box">${iconSVG('star',20)}<div class="kval">${highestAvgSubj[1].toFixed(1)}/10</div><div class="klabel">Highest Average</div><div class="klabel" style="font-weight:600;color:var(--ink-700);">${highestAvgSubj[0]}</div></div>
-  <div class="kpi-box">${iconSVG('book',20)}<div class="kval">${mostAnsSubj[1]}</div><div class="klabel">Most Answers</div><div class="klabel" style="font-weight:600;color:var(--ink-700);">${mostAnsSubj[0]}</div></div>
-`;
+function kpiBox(icon, accent, val, label, sub){
+  return `<div class="kpi-box">
+    <div class="kpi-icon-circle" style="background:${accent}1f;color:${accent};">${iconSVG(icon,15)}</div>
+    <div class="kval">${val}</div>
+    <div class="klabel">${label}</div>
+    <div class="ksub">${sub}</div>
+  </div>`;
+}
+document.getElementById('topPerf').innerHTML =
+  kpiBox('trophy', '#e0a021', (bestRow.marks/bestRow.max*100).toFixed(0)+'%', 'Best Score', `${bestRow.subject} ${bestRow.subtopic.split(' ').slice(0,2).join(' ')}`) +
+  kpiBox('star', '#3b6fd5', highestAvgSubj[1].toFixed(0)+'%', 'Highest Average', highestAvgSubj[0]) +
+  kpiBox('book', '#7a4fd5', mostAnsSubj[1], 'Most Answers', mostAnsSubj[0]);
 
 /* ---------- PYQ tracker (sample targets since sheet has PDF/Status cols but no PYQ totals yet) ---------- */
 const pyqTotal=200, pyqWritten=90;
@@ -827,12 +925,12 @@ document.getElementById('pyqProgress').innerHTML = pyqBySubj.map(([s,pct])=>`
 `).join('');
 
 /* ---------- overall progress ---------- */
-const scoreThresholdCount = ANSWERS.filter(a=> (a.marks/a.max*10) >= 6).length;
+const scoreThresholdCount = ANSWERS.filter(a=> (a.marks/a.max*100) >= 60).length;
 const overallItems = [
   ['Answers Written', totalAnswers, 200, '#3b6fd5'],
   ['PYQs Written (sample)', pyqWritten, 200, '#2c8a46'],
   ['Revisions Done (sample)', 35, 80, '#e0a021'],
-  ['Answers ≥ 6/10', scoreThresholdCount, totalAnswers, '#7a4fd5'],
+  ['Answers ≥ 60%', scoreThresholdCount, totalAnswers, '#7a4fd5'],
 ];
 const overallPct = Math.round(overallItems.reduce((s,i)=>s+i[1],0)/overallItems.reduce((s,i)=>s+i[2],0)*100);
 document.getElementById('overallPct').textContent = overallPct+'%';
@@ -851,7 +949,7 @@ ANSWERS.forEach(a=>{ if(a.gapCategory) gapCounts[a.gapCategory] = (gapCounts[a.g
 const topGap = Object.entries(gapCounts).sort((a,b)=>b[1]-a[1])[0];
 const topGapPct = Math.round(topGap[1]/totalAnswers*100);
 document.getElementById('focusArea').innerHTML = `
-  <div class="focus-headline">${weakestPaper[0]} <span>· ${weakestPaper[1].toFixed(1)}/10 avg</span></div>
+  <div class="focus-headline">${weakestPaper[0]} <span>· ${weakestPaper[1].toFixed(0)}% avg</span></div>
   <div class="focus-sub">Your lowest-scoring paper, across ${weakestPaperCount} answers.</div>
   <div class="focus-note">🔁 Recurring gap: <b>${topGap[0]}</b> flagged in ${topGap[1]} of ${totalAnswers} answers (${topGapPct}%) — this is costing you marks across papers, not just ${weakestPaper[0]}.</div>
   <div class="focus-secondary">Prioritize ${weakestPaper[0]} revision and deliberately add ${topGap[0].toLowerCase()} to your next 3 answers.</div>
@@ -872,7 +970,7 @@ function fmtExamDate(dateStr){ if(!dateStr) return '—'; const d = new Date(dat
 const bottomData = [
   ['plus', thisWeekCount, "This Week's Answers", thisWeekCount>=2 ? 'On pace for the weekly goal' : 'Behind pace — write more this week'],
   ['redo','35','Revisions Done','Sample — not tracked yet'],
-  ['trend','Mixed','Answer Quality Trend','+0.4/10 overall, dipped last 2'],
+  ['trend','Mixed','Answer Quality Trend','+4% overall, dipped last 2'],
   ['clip', prelimsDays==null?'—':prelimsDays, 'Prelims Countdown', `Days to ${fmtExamDate(examCfg.prelims)}`],
   ['time', mainsDays==null?'—':mainsDays, 'Mains Countdown', `Days to ${fmtExamDate(examCfg.mains)}`],
 ];
