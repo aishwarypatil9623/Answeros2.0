@@ -432,7 +432,8 @@
 
       <section class="card">
         <div class="card-head"><h3>Top Performance</h3></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;" id="topPerf"></div>
+        <div style="font-size:10.5px;color:var(--ink-500);margin:-4px 0 8px 0;">Tap a card to jump there filtered</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="topPerf"></div>
         <div class="motiv">
           <div class="plant">🪴</div>
           <div class="txt"><b>“Discipline today shapes<br>the freedom of your future.”</b>— Unknown</div>
@@ -886,17 +887,24 @@ function renderImprovement(){
 renderImprovement();
 document.getElementById('improvePeriod').addEventListener('change', renderImprovement);
 
-/* ---------- top performance (distinct accent per stat, kpi-icon-circle) ---------- */
-const bestRow = ANSWERS.reduce((b,a)=> (a.marks/a.max) > (b.marks/b.max)? a:b);
+/* ---------- top performance (innovated: type-aware bests + consistency, cross-filtering) ---------- */
+const best10Row = answersOfType(10).length ? answersOfType(10).reduce((b,a)=> (a.marks/a.max)>(b.marks/b.max)?a:b) : null;
+const best15Row = answersOfType(15).length ? answersOfType(15).reduce((b,a)=> (a.marks/a.max)>(b.marks/b.max)?a:b) : null;
 const bySubjAvg = {};
 subjLabels.forEach(s=>{
   const rows = ANSWERS.filter(a=>a.paper===s);
   bySubjAvg[s] = rows.reduce((sum,a)=>sum+a.marks/a.max*100,0)/rows.length;
 });
 const highestAvgSubj = Object.entries(bySubjAvg).sort((a,b)=>b[1]-a[1])[0];
-const mostAnsSubj = Object.entries(subjCounts).sort((a,b)=>b[1]-a[1])[0];
-function kpiBox(icon, accent, val, label, sub){
-  return `<div class="kpi-box">
+// most consistent subject = lowest std-deviation of score%, needs ≥2 answers to be meaningful
+function stdDev(nums){ const m = nums.reduce((s,v)=>s+v,0)/nums.length; return Math.sqrt(nums.reduce((s,v)=>s+(v-m)**2,0)/nums.length); }
+const consistency = subjLabels
+  .map(s=>{ const rows = ANSWERS.filter(a=>a.paper===s); return {s, n:rows.length, sd: rows.length>=2 ? stdDev(rows.map(a=>a.marks/a.max*100)) : null}; })
+  .filter(x=>x.sd!==null)
+  .sort((a,b)=>a.sd-b.sd)[0];
+
+function kpiBox(icon, accent, val, label, sub, onClick){
+  return `<div class="kpi-box" ${onClick?'style="cursor:pointer;"':''} data-kpi-action="${onClick||''}">
     <div class="kpi-icon-circle" style="background:${accent}1f;color:${accent};">${iconSVG(icon,15)}</div>
     <div class="kval">${val}</div>
     <div class="klabel">${label}</div>
@@ -904,9 +912,27 @@ function kpiBox(icon, accent, val, label, sub){
   </div>`;
 }
 document.getElementById('topPerf').innerHTML =
-  kpiBox('trophy', '#e0a021', (bestRow.marks/bestRow.max*100).toFixed(0)+'%', 'Best Score', `${bestRow.subject} ${bestRow.subtopic.split(' ').slice(0,2).join(' ')}`) +
-  kpiBox('star', '#3b6fd5', highestAvgSubj[1].toFixed(0)+'%', 'Highest Average', highestAvgSubj[0]) +
-  kpiBox('book', '#7a4fd5', mostAnsSubj[1], 'Most Answers', mostAnsSubj[0]);
+  kpiBox('flag', '#3b6fd5', best10Row?(best10Row.marks/best10Row.max*100).toFixed(0)+'%':'—', 'Best 10-Mark', best10Row?`${best10Row.subject} ${best10Row.subtopic.split(' ').slice(0,2).join(' ')}`:'No 10-mark answers yet', 'type:10') +
+  kpiBox('trophy', '#2c8a46', best15Row?(best15Row.marks/best15Row.max*100).toFixed(0)+'%':'—', 'Best 15-Mark', best15Row?`${best15Row.subject} ${best15Row.subtopic.split(' ').slice(0,2).join(' ')}`:'No 15-mark answers yet', 'type:15') +
+  kpiBox('star', '#e0a021', highestAvgSubj[1].toFixed(0)+'%', 'Highest Average', highestAvgSubj[0], `subj:${highestAvgSubj[0]}`) +
+  kpiBox('target', '#7a4fd5', consistency?'±'+consistency.sd.toFixed(1)+'%':'—', 'Most Consistent', consistency?`${consistency.s} (n=${consistency.n})`:'Not enough data yet', consistency?`subj:${consistency.s}`:'');
+
+/* clicking a Top Performance box cross-filters Score Trend (by type) or Recent Answers (by subject) */
+document.getElementById('topPerf').addEventListener('click', (e)=>{
+  const box = e.target.closest('[data-kpi-action]');
+  if(!box) return;
+  const action = box.dataset.kpiAction;
+  if(!action) return;
+  if(action.startsWith('type:')){
+    document.getElementById('trendTypeFilter').value = action.split(':')[1];
+    renderScoreTrend();
+    document.getElementById('scoreTrend').scrollIntoView({behavior:'smooth', block:'center'});
+  } else if(action.startsWith('subj:')){
+    raSubjSelect.value = action.split(':')[1];
+    renderRecent();
+    document.getElementById('recentList').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+});
 
 /* ---------- PYQ tracker (sample targets since sheet has PDF/Status cols but no PYQ totals yet) ---------- */
 const pyqTotal=200, pyqWritten=90;
