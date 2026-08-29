@@ -72,6 +72,16 @@
   .chip:hover{border-color:var(--green-600);}
   .chip.active{background:var(--green-800);border-color:var(--green-800);color:#fff;}
 
+  /* topic briefing strip — shows when a subtopic is selected */
+  .topic-briefing{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:linear-gradient(135deg,var(--green-900),var(--green-700));color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:16px;box-shadow:var(--shadow);}
+  .topic-briefing .tb-name{font-size:14.5px;font-weight:700;flex:1;min-width:180px;}
+  .topic-briefing .tb-name span{display:block;font-size:10px;font-weight:600;color:#c9e5d0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;}
+  .topic-briefing .tb-stat{text-align:center;}
+  .topic-briefing .tb-stat .tbv{font-size:17px;font-weight:800;}
+  .topic-briefing .tb-stat .tbl{font-size:9.5px;color:#c9e5d0;margin-top:1px;white-space:nowrap;}
+  .topic-briefing .tb-clear{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:11px;font-weight:700;padding:7px 12px;border-radius:8px;cursor:pointer;flex-shrink:0;}
+  .topic-briefing .tb-clear:hover{background:rgba(255,255,255,.25);}
+
   /* ===== Content-type view ===== */
   .type-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
   .type-tab{padding:9px 15px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12.5px;font-weight:700;color:var(--ink-700);cursor:pointer;display:flex;align-items:center;gap:7px;}
@@ -145,9 +155,9 @@
   <main>
     <div class="pagehead">
       <h1>Learnings</h1>
-      <p>Every reusable Introduction, Body element and Conclusion from your 12 answers — browsable by structure or by theme.</p>
+      <p id="pageheadSub">Every reusable Introduction, Body element and Conclusion from your answers — browsable by structure or by theme.</p>
     </div>
-    <div class="note-banner">📚 Built from your real 12 answers. "Body Material" combines Value Additions, Examples/Data, Must-Have Points and Keywords — your sheet doesn't store these under one "Body" label, so this groups them by function, not by a literal column.</div>
+    <div class="note-banner" id="noteBanner">📚 "Body Material" combines Value Additions, Examples/Data, Must-Have Points and Keywords — your sheet doesn't store these under one "Body" label, so this groups them by function, not by a literal column.</div>
 
     <div class="ministat-row" id="ministats"></div>
 
@@ -169,8 +179,12 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="searchBox" placeholder="Search across everything…" />
         </div>
+        <select id="subtopicFilter" class="dropdown" style="font-family:inherit;font-size:12.5px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;appearance:none;min-width:220px;">
+          <option value="All">All Subtopics (Syllabus Themes)</option>
+        </select>
         <div class="chips" id="paperChips"></div>
       </div>
+      <div id="topicBriefing" style="display:none;"></div>
       <div class="type-tabs" id="typeTabs"></div>
       <div class="content-list" id="contentList"></div>
     </div>
@@ -194,30 +208,33 @@ ANSWERS.forEach(a=>{ a.score = a.marks/a.max*10; });
 const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', PSIR:'#22a3a3', Essay:'#c98a1f'};
 function scoreTier(s){ return s>=6.5?{bg:'#e6f4ea',fg:'#1c5c30'}:s>=4.5?{bg:'#fbf5e8',fg:'#8a6212'}:{bg:'#fbf1ee',fg:'#b3402c'}; }
 
-/* ---------- nav ---------- */
+/* ---------- nav (unified icon library, matches Dashboard) ---------- */
+const ICON_PATHS = {
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  bar:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/>',
+  archive:'<rect x="3" y="3" width="18" height="4" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 13h4"/>',
+  book:'<path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>',
+  refresh:'<path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/>',
+  layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5z"/><path d="M3 17l9 5 9-5"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  flag:'<path d="M5 3v18"/><path d="M5 4h13l-2.5 4L18 12H5"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
+};
 function navIcon(name){
-  const p = {
-    grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-    list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-    bar:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
-    archive:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 13h4"/>',
-    book:'<path d="M4 4.5A2.5 2.5 0 016.5 2H20v18H6.5A2.5 2.5 0 004 17.5v-13z"/><path d="M4 17.5A2.5 2.5 0 016.5 15H20"/>',
-    refresh:'<path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/>',
-    layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
-    cal2:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
-    flag:'<path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5"/>',
-    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
-  };
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p[name]}</svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name]||''}</svg>`;
 }
 document.getElementById('nav').innerHTML = [
   ['Dashboard','grid','answeros-dashboard.html'],['All Answers','list','answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html'],
   ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html',true],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
-  ['Calendar','cal2','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
+  ['Calendar','calendar','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
 ].map(([label,ic,href,active])=> href
     ? `<a href="${href}" class="nav-item ${active?'active':''}" style="text-decoration:none;">${navIcon(ic)}<span>${label}</span></a>`
     : `<div class="nav-item" style="opacity:.55;cursor:default;">${navIcon(ic)}<span>${label}</span></div>`
 ).join('');
+
+document.getElementById('pageheadSub').textContent = `Every reusable Introduction, Body element and Conclusion from your ${ANSWERS.length} answers — browsable by structure or by theme.`;
+document.getElementById('noteBanner').innerHTML = `📚 Built from your real ${ANSWERS.length} answers. "Body Material" combines Value Additions, Examples/Data, Must-Have Points and Keywords — your sheet doesn't store these under one "Body" label, so this groups them by function, not by a literal column.`;
 
 /* ---------- mini stats ---------- */
 const totalAnswers = ANSWERS.length;
@@ -233,6 +250,7 @@ document.getElementById('ministats').innerHTML = `
 
 /* ---------- state ---------- */
 let activePaper = 'All';
+let activeSubtopic = 'All';
 let searchTerm = '';
 let activeType = 'intro';
 let currentView = 'type';
@@ -256,9 +274,61 @@ document.getElementById('paperChips').addEventListener('click', e=>{
   const chip = e.target.closest('.chip'); if(!chip) return;
   activePaper = chip.dataset.paper;
   document.querySelectorAll('#paperChips .chip').forEach(c=>c.classList.toggle('active', c===chip));
+  populateSubtopicFilter(); // subtopic list narrows to whichever paper is selected
   renderContentList();
+  if(currentView==='tree') renderTree();
 });
 document.getElementById('searchBox').addEventListener('input', e=>{ searchTerm = e.target.value.toLowerCase(); renderContentList(); });
+
+/* ---------- subtopic filter (syllabus-theme categorisation) ---------- */
+function populateSubtopicFilter(){
+  const pool = activePaper==='All' ? ANSWERS : ANSWERS.filter(a=>a.paper===activePaper);
+  const counts = {};
+  pool.forEach(a=>{ counts[a.subtopic] = (counts[a.subtopic]||0)+1; });
+  const subtopics = Object.keys(counts).sort((a,b)=> counts[b]-counts[a] || a.localeCompare(b));
+  const sel = document.getElementById('subtopicFilter');
+  const keepSelection = subtopics.includes(activeSubtopic) ? activeSubtopic : 'All';
+  sel.innerHTML = `<option value="All">All Subtopics (Syllabus Themes)</option>` +
+    subtopics.map(s=>`<option value="${s.replace(/"/g,'&quot;')}" ${s===keepSelection?'selected':''}>${s} (${counts[s]})</option>`).join('');
+  activeSubtopic = keepSelection;
+}
+populateSubtopicFilter();
+document.getElementById('subtopicFilter').addEventListener('change', e=>{
+  activeSubtopic = e.target.value;
+  renderTopicBriefing();
+  renderContentList();
+  if(currentView==='tree') renderTree();
+});
+
+/* ---------- topic briefing — turns the filter into a revision briefing, not just a filter ---------- */
+function renderTopicBriefing(){
+  const box = document.getElementById('topicBriefing');
+  if(activeSubtopic==='All'){ box.style.display='none'; box.innerHTML=''; return; }
+  const rows = ANSWERS.filter(a=>a.subtopic===activeSubtopic);
+  if(!rows.length){ box.style.display='none'; return; }
+  const avg = rows.reduce((s,a)=>s+a.score,0)/rows.length;
+  const dates = rows.map(a=>new Date(a.date)).sort((a,b)=>a-b);
+  const daysSinceLast = Math.round((AnswerOSData.today() - dates[dates.length-1]) / 86400000);
+  const papersHere = [...new Set(rows.map(a=>a.paper))].join(', ');
+  box.style.display = 'flex';
+  box.className = 'topic-briefing';
+  box.innerHTML = `
+    <div class="tb-name"><span>Topic Briefing</span>${activeSubtopic}</div>
+    <div class="tb-stat"><div class="tbv">${rows.length}</div><div class="tbl">Answers</div></div>
+    <div class="tb-stat"><div class="tbv">${(avg*10).toFixed(0)}%</div><div class="tbl">Avg Score</div></div>
+    <div class="tb-stat"><div class="tbv">${papersHere}</div><div class="tbl">Paper(s)</div></div>
+    <div class="tb-stat"><div class="tbv">${daysSinceLast}d</div><div class="tbl">Since Last Attempt</div></div>
+    <button class="tb-clear" id="tbClear">Clear Filter ✕</button>
+  `;
+  document.getElementById('tbClear').addEventListener('click', ()=>{
+    activeSubtopic = 'All';
+    document.getElementById('subtopicFilter').value = 'All';
+    renderTopicBriefing();
+    renderContentList();
+    if(currentView==='tree') renderTree();
+  });
+}
+renderTopicBriefing();
 
 /* ---------- content type tabs ---------- */
 const TYPES = [
@@ -285,6 +355,7 @@ renderTypeTabs();
 /* ---------- content list (by type) ---------- */
 function matchesFilter(a){
   if(activePaper!=='All' && a.paper!==activePaper) return false;
+  if(activeSubtopic!=='All' && a.subtopic!==activeSubtopic) return false;
   return true;
 }
 function renderContentList(){
@@ -343,13 +414,19 @@ renderContentList();
 
 /* ---------- tree view (Paper > Subject > Subtopic) ---------- */
 function renderTree(){
+  const rows = ANSWERS.filter(matchesFilter);
+  if(!rows.length){
+    document.getElementById('tree').innerHTML = `<div style="padding:40px;text-align:center;color:var(--ink-500);font-size:13px;background:#fff;border:1px dashed var(--line);border-radius:12px;">Nothing matches this filter.</div>`;
+    return;
+  }
   const byPaper = {};
-  ANSWERS.forEach(a=>{
+  rows.forEach(a=>{
     byPaper[a.paper] = byPaper[a.paper] || {};
     byPaper[a.paper][a.subject] = byPaper[a.paper][a.subject] || [];
     byPaper[a.paper][a.subject].push(a);
   });
-  const papers = Object.keys(byPaper).sort((a,b)=> byPaper[b] ? Object.values(byPaper[b]).flat().length - Object.values(byPaper[a]).flat().length : 0);
+  const papers = Object.keys(byPaper).sort((a,b)=> Object.values(byPaper[b]).flat().length - Object.values(byPaper[a]).flat().length);
+  const filtered = activePaper!=='All' || activeSubtopic!=='All'; // when filtering down, open every group so results aren't hidden behind a collapsed accordion
 
   document.getElementById('tree').innerHTML = papers.map((p,pi)=>{
     const subjects = byPaper[p];
@@ -361,7 +438,7 @@ function renderTree(){
         <div class="subject-title">${subj} (${answers.length})</div>
         ${answers.map(a=>{
           const tier = scoreTier(a.score);
-          return `<div class="subtopic-row">
+          return `<div class="subtopic-row" ${a.subtopic===activeSubtopic?'style="outline:2px solid var(--green-600);"':''}>
             <div class="subtopic-dot"></div>
             <div class="subtopic-main">
               <div class="subtopic-name">${a.subtopic}</div>
@@ -373,7 +450,7 @@ function renderTree(){
       </div>
     `).join('');
 
-    return `<div class="paper-group ${pi===0?'open':''}" data-paper-group="${p}">
+    return `<div class="paper-group ${(pi===0||filtered)?'open':''}" data-paper-group="${p}">
       <div class="paper-head" data-toggle="${p}">
         <span class="paper-badge" style="background:${col}1a;color:${col};">${p}</span>
         <span class="paper-title">${p}</span>
