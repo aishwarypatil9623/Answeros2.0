@@ -86,6 +86,14 @@
 
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:#d7dcd8;border-radius:8px;}
+
+  .weak-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .weak-row:last-child{border-bottom:none;}
+  .weak-rank{width:22px;height:22px;border-radius:50%;background:var(--red-50);color:var(--red);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .weak-main{flex:1;min-width:0;}
+  .weak-name{font-size:12.5px;font-weight:700;color:var(--ink-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .weak-meta{font-size:10.5px;color:var(--ink-500);margin-top:1px;}
+  .weak-score{font-size:15px;font-weight:800;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -113,16 +121,16 @@
   <main>
     <div class="pagehead">
       <h1>Analytics</h1>
-      <p>The patterns underneath your 12 logged answers — where marks are actually being lost.</p>
+      <p id="pageheadSub">The patterns underneath your logged answers — where marks are actually being lost.</p>
     </div>
-    <div class="note-banner">📊 Built from the same 12 real answers as your Dashboard and All Answers page. No sample data here — every number below is computed directly, including the uncomfortable ones.</div>
+    <div class="note-banner" id="noteBanner">📊 Built from the same real answers as your Dashboard and All Answers page. No sample data here — every number below is computed directly, including the uncomfortable ones.</div>
 
     <div class="ministat-row" id="ministats"></div>
 
     <div class="grid2">
       <section class="card">
         <div class="card-head"><h3>Score Distribution</h3></div>
-        <div class="card-sub">How your 12 scores spread across the 0–10 band.</div>
+        <div class="card-sub" id="distSub">How your scores spread across the 0–100% band.</div>
         <canvas id="distChart" height="160"></canvas>
         <div class="insight-box flag" id="distInsight"></div>
       </section>
@@ -145,7 +153,7 @@
 
       <section class="card">
         <div class="card-head"><h3>Recurring Feedback Gap</h3></div>
-        <div class="card-sub">The specific weakness flagged most often across all 12 answers, regardless of paper.</div>
+        <div class="card-sub" id="gapSub">The specific weakness flagged most often across all your answers, regardless of paper.</div>
         <div style="display:flex;gap:16px;align-items:center;">
           <div style="position:relative;width:120px;height:120px;flex-shrink:0;">
             <canvas id="gapDonut"></canvas>
@@ -171,6 +179,28 @@
         <div class="insight-box" id="consistencyInsight"></div>
       </section>
     </div>
+
+    <div class="grid2">
+      <section class="card">
+        <div class="card-head"><h3>10-Mark vs 15-Mark Performance</h3></div>
+        <div class="card-sub">Does answer length/depth requirement change how well you score?</div>
+        <canvas id="typeChart" height="160"></canvas>
+        <div class="insight-box" id="typeInsight"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h3>Word Count vs Score</h3></div>
+        <div class="card-sub">Are longer or shorter-than-typical answers actually scoring better?</div>
+        <canvas id="wordCorrChart" height="180"></canvas>
+        <div class="insight-box" id="wordCorrInsight"></div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h3>Weakest Subtopics — Revision Priority</h3></div>
+      <div class="card-sub">Syllabus themes scoring lowest (min. 2 attempts) — where a targeted re-read pays off most before the exam.</div>
+      <div id="weakSubtopics"></div>
+    </section>
   </main>
 </div>
 
@@ -181,30 +211,34 @@
    page can do real cross-cuts without re-fetching anything.
 ============================================================ */
 const ANSWERS = AnswerOSData.getAnswers();
-ANSWERS.forEach(a=> a.score = a.marks/a.max*10);
+ANSWERS.forEach(a=>{
+  a.score = a.marks/a.max*100; // percentage scale — matches Dashboard/Learnings/All Answers
+  a.demand = a.demandPct==null ? 0 : a.demandPct; // BUGFIX: a.demand was the raw rail-tick array (demandItems), not a number —
+  // every arithmetic use of it below (Pearson r, scatter chart) was silently computing on arrays. This restores the real % value.
+});
 
 const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#c98a1f', PSIR:'#22a3a3'};
 
-/* ---------- nav ---------- */
+/* ---------- nav (unified icon library, matches Dashboard/Learnings) ---------- */
+const ICON_PATHS = {
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  bar:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/>',
+  archive:'<rect x="3" y="3" width="18" height="4" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 13h4"/>',
+  book:'<path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>',
+  refresh:'<path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/>',
+  layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5z"/><path d="M3 17l9 5 9-5"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  flag:'<path d="M5 3v18"/><path d="M5 4h13l-2.5 4L18 12H5"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
+};
 function navIcon(name){
-  const p = {
-    grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-    list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-    bar:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
-    archive:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 13h4"/>',
-    book:'<path d="M4 4.5A2.5 2.5 0 016.5 2H20v18H6.5A2.5 2.5 0 004 17.5v-13z"/><path d="M4 17.5A2.5 2.5 0 016.5 15H20"/>',
-    refresh:'<path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/>',
-    layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
-    cal2:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
-    flag:'<path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5"/>',
-    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
-  };
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p[name]}</svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name]||''}</svg>`;
 }
 document.getElementById('nav').innerHTML = [
   ['Dashboard','grid','answeros-dashboard.html'],['All Answers','list','answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html',true],
   ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
-  ['Calendar','cal2','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
+  ['Calendar','calendar','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
 ].map(([label,ic,href,active])=> href
     ? `<a href="${href}" class="nav-item ${active?'active':''}" style="text-decoration:none;">${navIcon(ic)}<span>${label}</span></a>`
     : `<div class="nav-item" style="opacity:.55;cursor:default;">${navIcon(ic)}<span>${label}</span></div>`
@@ -212,7 +246,9 @@ document.getElementById('nav').innerHTML = [
 
 /* ---------- mini stats ---------- */
 const totalAnswers = ANSWERS.length;
-const scores = ANSWERS.map(a=>a.score);
+document.getElementById('pageheadSub').textContent = `The patterns underneath your ${totalAnswers} logged answers — where marks are actually being lost.`;
+document.getElementById('noteBanner').innerHTML = `📊 Built from the same real ${totalAnswers} answers as your Dashboard and All Answers page. No sample data here — every number below is computed directly, including the uncomfortable ones.`;
+const scores = ANSWERS.map(a=>a.marks/a.max*100); // percentage scale, matches Dashboard/Learnings
 const mean = scores.reduce((a,b)=>a+b,0)/totalAnswers;
 const variance = scores.reduce((s,x)=>s+(x-mean)**2,0)/totalAnswers;
 const stdev = Math.sqrt(variance);
@@ -224,16 +260,16 @@ const spanDays = Math.round((dates[dates.length-1]-dates[0])/(1000*60*60*24));
 const paceWk = (totalAnswers/(spanDays/7)).toFixed(1);
 
 document.getElementById('ministats').innerHTML = `
-  <div class="ministat"><div class="mv">${mean.toFixed(1)}/10</div><div class="ml">Mean Score</div></div>
-  <div class="ministat flag"><div class="mv">±${stdev.toFixed(2)}</div><div class="ml">Score Std. Deviation</div></div>
+  <div class="ministat"><div class="mv">${mean.toFixed(0)}%</div><div class="ml">Mean Score</div></div>
+  <div class="ministat flag"><div class="mv">±${stdev.toFixed(1)}%</div><div class="ml">Score Std. Deviation</div></div>
   <div class="ministat"><div class="mv">${paceWk}/wk</div><div class="ml">Writing Pace</div></div>
   <div class="ministat flag"><div class="mv">${longestGap}d</div><div class="ml">Longest Gap</div></div>
 `;
 
-/* ---------- score distribution ---------- */
+/* ---------- score distribution (percentage bands) ---------- */
 const bands = [
-  {label:'0–2', min:0, max:2}, {label:'2–4', min:2, max:4}, {label:'4–6', min:4, max:6},
-  {label:'6–8', min:6, max:8}, {label:'8–10', min:8, max:10.01},
+  {label:'0–20%', min:0, max:20}, {label:'20–40%', min:20, max:40}, {label:'40–60%', min:40, max:60},
+  {label:'60–80%', min:60, max:80}, {label:'80–100%', min:80, max:100.01},
 ];
 const bandCounts = bands.map(b=> scores.filter(s=>s>=b.min && s<b.max).length);
 new Chart(document.getElementById('distChart'), {
@@ -241,9 +277,10 @@ new Chart(document.getElementById('distChart'), {
   data:{ labels: bands.map(b=>b.label), datasets:[{ data: bandCounts, backgroundColor: bands.map((b,i)=> i<2 ? '#b3402c' : i<3 ? '#c98a1f' : '#2c8a46'), borderRadius:6, maxBarThickness:48 }] },
   options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, ticks:{stepSize:1}, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} } }
 });
-const below4 = bandCounts[0]+bandCounts[1];
-const below4Pct = Math.round(below4/totalAnswers*100);
-document.getElementById('distInsight').innerHTML = `<b>${below4Pct}% of your answers (${below4}/${totalAnswers}) score below 4/10.</b> None have crossed 6/10 yet. That's the honest baseline — everything else on this page is about closing that gap.`;
+const below40 = bandCounts[0]+bandCounts[1];
+const below40Pct = Math.round(below40/totalAnswers*100);
+const above60 = bandCounts[3]+bandCounts[4];
+document.getElementById('distInsight').innerHTML = `<b>${below40Pct}% of your answers (${below40}/${totalAnswers}) score below 40%.</b> ${above60} answer${above60===1?'':'s'} ha${above60===1?'s':'ve'} crossed 60%. That's the honest baseline — everything else on this page is about closing that gap.`;
 
 /* ---------- paper-wise performance ---------- */
 const papers = [...new Set(ANSWERS.map(a=>a.paper))];
@@ -254,11 +291,11 @@ const paperAvg = papers.map(p=>{
 new Chart(document.getElementById('paperChart'), {
   type:'bar',
   data:{ labels: paperAvg.map(p=>`${p.paper} (n=${p.n})`), datasets:[{ data: paperAvg.map(p=>+p.avg.toFixed(2)), backgroundColor: paperAvg.map(p=>PAPER_COLORS[p.paper]), borderRadius:6, maxBarThickness:48 }] },
-  options:{ plugins:{legend:{display:false}}, scales:{ y:{min:0,max:10, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} } }
+  options:{ plugins:{legend:{display:false}}, scales:{ y:{min:0,max:100, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} } }
 });
 const weakestP = paperAvg.slice().sort((a,b)=>a.avg-b.avg)[0];
 const strongestP = paperAvg.slice().sort((a,b)=>b.avg-a.avg)[0];
-document.getElementById('paperInsight').innerHTML = `<b>${weakestP.paper}</b> is your weakest paper at ${weakestP.avg.toFixed(1)}/10 (n=${weakestP.n}). <b>${strongestP.paper}</b> leads at ${strongestP.avg.toFixed(1)}/10 (n=${strongestP.n}). With samples this small, treat this as a direction to watch, not a verdict — revisit after 5+ answers per paper.`;
+document.getElementById('paperInsight').innerHTML = `<b>${weakestP.paper}</b> is your weakest paper at ${weakestP.avg.toFixed(0)}% (n=${weakestP.n}). <b>${strongestP.paper}</b> leads at ${strongestP.avg.toFixed(0)}% (n=${strongestP.n}). With samples this small, treat this as a direction to watch, not a verdict — revisit after 5+ answers per paper.`;
 
 /* ---------- directive-wise performance ---------- */
 const directives = [...new Set(ANSWERS.map(a=>a.directive))];
@@ -269,11 +306,11 @@ const dirAvg = directives.map(d=>{
 new Chart(document.getElementById('directiveChart'), {
   type:'bar',
   data:{ labels: dirAvg.map(d=>`${d.directive} (n=${d.n})`), datasets:[{ data: dirAvg.map(d=>+d.avg.toFixed(2)), backgroundColor:'#7a4fd5', borderRadius:6, maxBarThickness:40 }] },
-  options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{min:0,max:10, grid:{color:'#eef1ee'}}, y:{grid:{display:false}} } }
+  options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{min:0,max:100, grid:{color:'#eef1ee'}}, y:{grid:{display:false}} } }
 });
 const mainDir = dirAvg.filter(d=>d.n>=2).sort((a,b)=>a.avg-b.avg)[0];
 document.getElementById('directiveInsight').innerHTML = mainDir
-  ? `Among directives you've practiced more than once, <b>"${mainDir.directive}"</b> sits lowest at ${mainDir.avg.toFixed(1)}/10 (n=${mainDir.n}). Single-attempt directives aren't shown here as a verdict — one answer isn't a trend.`
+  ? `Among directives you've practiced more than once, <b>"${mainDir.directive}"</b> sits lowest at ${mainDir.avg.toFixed(0)}% (n=${mainDir.n}). Single-attempt directives aren't shown here as a verdict — one answer isn't a trend.`
   : `Not enough repeats per directive yet to call a pattern — most have only 1 attempt so far.`;
 
 /* ---------- gap category ---------- */
@@ -301,20 +338,26 @@ function pearsonR(xs, ys){
   const cov = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my),0)/n;
   const sx = Math.sqrt(xs.reduce((s,x)=>s+(x-mx)**2,0)/n);
   const sy = Math.sqrt(ys.reduce((s,y)=>s+(y-my)**2,0)/n);
-  return cov/(sx*sy);
+  return sx===0||sy===0 ? 0 : cov/(sx*sy);
 }
 const demandVals = ANSWERS.map(a=>a.demand);
 const r = pearsonR(demandVals, scores);
+const demandMin = Math.min(...demandVals), demandMax = Math.max(...demandVals);
+const demandPad = Math.max(5, (demandMax-demandMin)*0.15);
 new Chart(document.getElementById('corrChart'), {
   type:'scatter',
-  data:{ datasets:[{ data: ANSWERS.map(a=>({x:a.demand, y:+a.score.toFixed(2)})), backgroundColor:'#2c8a46', pointRadius:6, pointHoverRadius:8 }] },
+  data:{ datasets:[{ data: ANSWERS.map(a=>({x:a.demand, y:+a.score.toFixed(1)})), backgroundColor:'#2c8a46', pointRadius:6, pointHoverRadius:8 }] },
   options:{ plugins:{legend:{display:false}}, scales:{
-    x:{title:{display:true,text:'% Demand Addressed'}, min:30, max:70, grid:{color:'#eef1ee'}},
-    y:{title:{display:true,text:'Score /10'}, min:0, max:10, grid:{color:'#eef1ee'}}
+    x:{title:{display:true,text:'% Demand Addressed'}, min:Math.max(0,Math.floor(demandMin-demandPad)), max:Math.ceil(demandMax+demandPad), grid:{color:'#eef1ee'}},
+    y:{title:{display:true,text:'Score %'}, min:0, max:100, grid:{color:'#eef1ee'}}
   }}
 });
 const rStrength = Math.abs(r)>=0.6?'moderately strong':Math.abs(r)>=0.3?'moderate':'weak';
-document.getElementById('corrInsight').innerHTML = `Correlation r = <b>${r.toFixed(2)}</b> — a ${rStrength} positive relationship. Addressing more of what the question actually demands is tracking with higher scores, which is expected — but it also means demand-coverage is a lever you can pull directly, not a vague "write better" ask.`;
+const rDirection = r>=0 ? 'positive' : 'negative';
+document.getElementById('corrInsight').innerHTML = `Correlation r = <b>${r.toFixed(2)}</b> — a ${rStrength} ${rDirection} relationship. ${r>=0.15
+    ? 'Addressing more of what the question actually demands is tracking with higher scores, which is expected — demand-coverage is a lever you can pull directly, not a vague "write better" ask.'
+    : 'With this few data points, no clean pattern has emerged yet between demand-coverage and score — worth re-checking once you have 10+ more answers logged rather than reading much into it now.'
+  }`;
 
 /* ---------- writing consistency ---------- */
 const gapMax = Math.max(...gaps, 1);
@@ -324,7 +367,79 @@ document.getElementById('gapStrip').innerHTML = gaps.map((g,i)=>{
   return `<div class="gap-row"><div class="gday">Gap ${i+1}</div><div class="gap-track"><div style="width:${pct}%;background:${color};"></div></div><div class="gval">${g}d</div></div>`;
 }).join('');
 const bigGaps = gaps.filter(g=>g>=7).length;
-document.getElementById('consistencyInsight').innerHTML = `Longest stretch without an answer: <b>${longestGap} days</b> (mid-to-late July). Outside that one dip, you're writing every 1–5 days — the pattern breaks around long gaps, not short ones. ${bigGaps>1?'Watch for repeat week-plus gaps — they compound.':'One outlier so far — worth watching if it repeats.'}`;
+document.getElementById('consistencyInsight').innerHTML = `Longest stretch without an answer: <b>${longestGap} days</b>. Outside that dip, check the pace above for your typical rhythm. ${bigGaps>1?'Watch for repeat week-plus gaps — they compound.':'One outlier so far — worth watching if it repeats.'}`;
+
+/* ---------- 10-mark vs 15-mark performance ---------- */
+const typeGroups = [10,15].map(m=>{
+  const rows = ANSWERS.filter(a=>a.max===m);
+  return { max:m, n:rows.length, avg: rows.length? rows.reduce((s,a)=>s+a.score,0)/rows.length : null };
+}).filter(t=>t.n>0);
+new Chart(document.getElementById('typeChart'), {
+  type:'bar',
+  data:{ labels: typeGroups.map(t=>`${t.max}-Mark (n=${t.n})`), datasets:[{ data: typeGroups.map(t=>+t.avg.toFixed(1)), backgroundColor:['#3b6fd5','#2c8a46'], borderRadius:6, maxBarThickness:60 }] },
+  options:{ plugins:{legend:{display:false}}, scales:{ y:{min:0,max:100,grid:{color:'#eef1ee'}}, x:{grid:{display:false}} } }
+});
+if(typeGroups.length===2){
+  const gap = Math.abs(typeGroups[0].avg-typeGroups[1].avg);
+  const weaker = typeGroups[0].avg < typeGroups[1].avg ? typeGroups[0] : typeGroups[1];
+  document.getElementById('typeInsight').innerHTML = gap>=5
+    ? `<b>${weaker.max}-mark answers are your weaker format</b>, averaging ${gap.toFixed(0)} percentage points below the other type. Worth practicing that length/depth specifically, not just more answers overall.`
+    : `Performance is close between formats (within ${gap.toFixed(0)} points) — question type doesn't look like the driver behind your score swings right now.`;
+} else {
+  document.getElementById('typeInsight').innerHTML = `Only one answer type logged so far (${typeGroups[0].max}-mark). This comparison needs at least one answer of the other type to say anything.`;
+}
+
+/* ---------- word count vs score ---------- */
+const wcRows = ANSWERS.filter(a=>a.wordCount!=null && !isNaN(a.wordCount));
+if(wcRows.length>=3){
+  const wcVals = wcRows.map(a=>a.wordCount);
+  const wcScores = wcRows.map(a=>a.score);
+  const rWC = pearsonR(wcVals, wcScores);
+  const wcMin = Math.min(...wcVals), wcMax = Math.max(...wcVals);
+  const wcPad = Math.max(10,(wcMax-wcMin)*0.15);
+  new Chart(document.getElementById('wordCorrChart'), {
+    type:'scatter',
+    data:{ datasets:[{ data: wcRows.map(a=>({x:a.wordCount, y:+a.score.toFixed(1)})), backgroundColor: wcRows.map(a=>a.max===10?'#3b6fd5':'#2c8a46'), pointRadius:6, pointHoverRadius:8 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{
+      x:{title:{display:true,text:'Word Count'}, min:Math.max(0,Math.floor(wcMin-wcPad)), max:Math.ceil(wcMax+wcPad), grid:{color:'#eef1ee'}},
+      y:{title:{display:true,text:'Score %'}, min:0, max:100, grid:{color:'#eef1ee'}}
+    }}
+  });
+  const wcStrength = Math.abs(rWC)>=0.6?'moderately strong':Math.abs(rWC)>=0.3?'moderate':'weak';
+  document.getElementById('wordCorrInsight').innerHTML = `Correlation r = <b>${rWC.toFixed(2)}</b> (${wcStrength}, blue=10-mark, green=15-mark). ${Math.abs(rWC)<0.2
+      ? 'Word count alone isn\'t explaining your score swings — length isn\'t your lever, content quality within the limit is.'
+      : rWC>0 ? 'Longer answers (within reason) are tracking with better scores — but check this against word-limit adherence, since consistently running over the limit has its own cost even if it correlates with marks here.'
+      : 'Shorter, tighter answers are tracking with better scores here — a signal that padding isn\'t helping, and concise, demand-focused writing may be worth leaning into.'
+    }`;
+} else {
+  document.getElementById('wordCorrChart').style.display='none';
+  document.getElementById('wordCorrInsight').innerHTML = `Not enough answers with a logged word count yet (need 3+) to check this correlation.`;
+}
+
+/* ---------- weakest subtopics (revision priority list) ---------- */
+const subtopicGroups = {};
+ANSWERS.forEach(a=>{
+  subtopicGroups[a.subtopic] = subtopicGroups[a.subtopic] || [];
+  subtopicGroups[a.subtopic].push(a);
+});
+const weakList = Object.entries(subtopicGroups)
+  .filter(([,rows])=>rows.length>=2)
+  .map(([name,rows])=>({ name, n:rows.length, avg: rows.reduce((s,a)=>s+a.score,0)/rows.length, paper: rows[0].paper }))
+  .sort((a,b)=>a.avg-b.avg)
+  .slice(0,5);
+const weakBox = document.getElementById('weakSubtopics');
+if(weakList.length){
+  weakBox.innerHTML = weakList.map((w,i)=>{
+    const tier = w.avg>=65?{bg:'#e6f4ea',fg:'#1c5c30'}:w.avg>=45?{bg:'#fbf5e8',fg:'#8a6212'}:{bg:'#fbf1ee',fg:'#b3402c'};
+    return `<div class="weak-row">
+      <div class="weak-rank">${i+1}</div>
+      <div class="weak-main"><div class="weak-name">${w.name}</div><div class="weak-meta">${w.paper} · ${w.n} attempts</div></div>
+      <div class="weak-score" style="color:${tier.fg};">${w.avg.toFixed(0)}%</div>
+    </div>`;
+  }).join('');
+} else {
+  weakBox.innerHTML = `<div style="padding:20px 0;text-align:center;color:var(--ink-500);font-size:12.5px;">No subtopic has 2+ attempts yet — this list needs repeats on the same theme to be meaningful. Check back as you revisit topics.</div>`;
+}
 </script>
 
 <script>
