@@ -188,6 +188,13 @@
   .subj-leg-label b{color:var(--ink-900);font-weight:700;}
   .subj-leg-count{font-size:12px;color:var(--ink-500);margin-left:4px;}
   .subj-leg-score{flex-shrink:0;font-size:12.5px;font-weight:800;padding:4px 10px;border-radius:7px;min-width:42px;text-align:center;}
+  .subj-leg-row{cursor:pointer;padding:4px 6px;margin:-4px -6px;border-radius:8px;transition:background .12s ease;}
+  .subj-leg-row:hover{background:var(--green-50);}
+  .subj-trend{font-size:11px;font-weight:800;flex-shrink:0;width:16px;text-align:center;}
+  .subj-trend.up{color:var(--green-700);}
+  .subj-trend.down{color:#b3402c;}
+  .subj-trend.flat{color:var(--ink-300);}
+  .subj-focus-tag{font-size:8.5px;font-weight:800;background:#fbf1ee;color:#b3402c;padding:2px 6px;border-radius:5px;margin-left:6px;letter-spacing:.02em;text-transform:uppercase;}
   .insight-note{background:var(--green-50);border-left:3px solid var(--green-600);border-radius:0 8px 8px 0;padding:9px 12px;font-size:11.5px;color:var(--ink-900);line-height:1.5;margin-top:14px;}
   .insight-note b{color:var(--green-800);}
 
@@ -200,22 +207,37 @@
   .ra-score{font-size:12.5px;font-weight:700;margin-left:auto;flex-shrink:0;}
   .chev{color:var(--ink-300);margin-left:6px;}
 
-  /* Calendar */
+  /* Calendar — matches the design language of the standalone Calendar page,
+     scaled down to fit a dashboard card instead of a full-width layout. */
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-  .cal-nav{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-500);}
-  .cal-nav b{color:var(--ink-900);font-size:12.5px;}
-  table.cal{width:100%;border-collapse:collapse;}
-  table.cal th{font-size:10px;color:var(--ink-500);font-weight:600;padding-bottom:6px;}
-  table.cal td{text-align:center;padding:3px;}
-  .cal-cell{width:30px;height:24px;border-radius:6px;font-size:11px;display:flex;align-items:center;justify-content:center;margin:0 auto;color:var(--ink-700);}
-  .cal-cell[data-date]:hover{outline:2px solid var(--green-700,#1f7a3d);outline-offset:1px;}
-  .cal-0{background:transparent;color:var(--ink-300);}
-  .cal-1{background:#dcf0e2;color:var(--green-800,#1c5c30);}
-  .cal-2{background:#9fd8b1;color:#0d3d1c;}
+  .cal-nav{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-500);}
+  .cal-nav b{color:var(--ink-900);font-size:12.5px;min-width:96px;text-align:center;display:inline-block;}
+  .cal-nav-btn{width:22px;height:22px;border-radius:7px;border:1px solid var(--line);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-700);}
+  .cal-nav-btn:hover{border-color:var(--green-600);}
+  .cal-today-btn{border:1px solid var(--line);border-radius:7px;padding:4px 9px;font-size:10.5px;font-weight:600;color:var(--ink-700);cursor:pointer;background:#fff;}
+  .cal-today-btn:hover{border-color:var(--green-600);}
+  table.cal{width:100%;border-collapse:collapse;table-layout:fixed;}
+  table.cal th{font-size:9.5px;color:var(--ink-500);font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding-bottom:8px;}
+  table.cal td{padding:2px;height:38px;vertical-align:top;}
+  .day-cell{width:100%;height:100%;border-radius:8px;padding:3px 0 0 5px;cursor:pointer;border:1.5px solid transparent;transition:border-color .12s ease;position:relative;font-size:11px;color:var(--ink-700);}
+  .day-cell:hover{border-color:var(--green-600);}
+  .day-cell.selected{border-color:var(--green-800);box-shadow:0 0 0 2px var(--green-100);}
+  .day-cell.today .day-num{background:var(--green-800);color:#fff;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;}
+  .day-cell.empty{cursor:default;}
+  .cal-0{background:#eef1ee;color:var(--ink-300);}
+  .cal-1{background:#cdeada;color:var(--green-800,#1c5c30);}
+  .cal-2{background:#7cc298;color:#0d3d1c;}
   .cal-3{background:var(--green-700);color:#fff;font-weight:700;}
-  .cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
+  .cal-legend{display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap;}
   .cal-legend .item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink-500);}
   .cal-legend .sw{width:11px;height:11px;border-radius:3px;}
+  #calDayDetail{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:11.5px;}
+  #calDayDetail .cdd-empty{color:var(--ink-500);}
+  #calDayDetail .cdd-date{font-weight:700;font-size:12px;margin-bottom:6px;}
+  #calDayDetail .cdd-row{display:flex;align-items:center;gap:8px;padding:5px 0;}
+  #calDayDetail .cdd-tag{font-size:9.5px;font-weight:800;border-radius:6px;padding:2px 6px;flex-shrink:0;}
+  #calDayDetail .cdd-topic{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #calDayDetail .cdd-score{font-weight:800;flex-shrink:0;}
 
   /* progress bars */
   .pb-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;}
@@ -402,16 +424,21 @@
       <section class="card">
         <div class="cal-head">
           <h3 style="font-size:14px;margin:0;">Consistency Calendar</h3>
-          <div class="cal-nav"><span class="icInline" data-ic="chevLeft" id="calPrev" style="cursor:pointer;padding:3px;"></span> <b id="calMonth">August 2026</b> <span class="icInline" data-ic="chevRight" id="calNext" style="cursor:pointer;padding:3px;"></span> <span id="calToday" style="margin-left:6px;border:1px solid var(--line);border-radius:6px;padding:2px 8px;color:var(--ink-700);font-weight:600;cursor:pointer;">Today</span></div>
+          <div class="cal-nav">
+            <div class="cal-nav-btn" id="calPrev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></div>
+            <b id="calMonth">August 2026</b>
+            <div class="cal-nav-btn" id="calNext"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>
+            <div class="cal-today-btn" id="calToday">Today</div>
+          </div>
         </div>
-        <div style="font-size:10.5px;color:var(--ink-500);margin:-4px 0 8px 0;">Click a day to filter Recent Answers</div>
         <table class="cal" id="calTable"></table>
         <div class="cal-legend">
           <div class="item"><div class="sw" style="background:#eef1ee;"></div>No answer</div>
-          <div class="item"><div class="sw" style="background:#dcf0e2;"></div>1 Answer</div>
-          <div class="item"><div class="sw" style="background:#9fd8b1;"></div>2 Answers</div>
+          <div class="item"><div class="sw" style="background:#cdeada;"></div>1 Answer</div>
+          <div class="item"><div class="sw" style="background:#7cc298;"></div>2 Answers</div>
           <div class="item"><div class="sw" style="background:var(--green-700);"></div>3+ Answers</div>
         </div>
+        <div id="calDayDetail"><div class="cdd-empty">Click a day to see what you wrote — also filters Recent Answers.</div></div>
       </section>
 
       <section class="card">
@@ -428,6 +455,7 @@
           <div style="font-size:11.5px;color:var(--ink-500);" id="improveSub">vs first week shown</div>
         </div>
         <canvas id="improveBar" height="150"></canvas>
+        <div class="insight-note" id="improveInsight" style="margin-top:10px;"></div>
       </section>
 
       <section class="card">
@@ -509,6 +537,7 @@ const ICON_PATHS = {
   layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>',
   flag:'<path d="M5 3v18"/><path d="M5 4h13l-2.5 4L18 12H5"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',
+  notes:'<path d="M9 2h6l5 5v13a2 2 0 01-2 2H9a2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   file:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/>',
   trophy:'<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M5 4H3v2a4 4 0 004 4M19 4h2v2a4 4 0 01-4 4"/>',
   star:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01z"/>',
@@ -530,7 +559,7 @@ document.querySelectorAll('.icInline').forEach(el=>{ el.innerHTML = iconSVG(el.d
 
 document.getElementById('nav').innerHTML = [
   ['Dashboard','grid','answeros-dashboard.html',true],['All Answers','list','answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html'],
-  ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
+  ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Notes','notes','answeros-notes.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
   ['Calendar','calendar','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
 ].map(([label,ic,href,active])=> href
     ? `<a href="${href}" class="nav-item ${active?'active':''}" style="text-decoration:none;">${iconSVG(ic,16)}<span>${label}</span></a>`
@@ -667,28 +696,64 @@ document.getElementById('totalAnswersDonut').textContent = totalAnswers;
 new Chart(document.getElementById('subjectDonut'), {
   type:'doughnut',
   data:{ labels: subjLabels, datasets:[{ data: subjLabels.map(s=>subjCounts[s]), backgroundColor: subjLabels.map(s=>SUBJECT_COLORS[s]||'#ccc'), borderWidth:3, borderColor:'#fff' }] },
-  options:{ cutout:'70%', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>{
+  options:{ cutout:'70%', onClick:(evt,elements)=>{ if(elements.length) jumpToSubject(subjLabels[elements[0].index]); },
+    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>{
     const s = ctx.label; const avg = subjScoreSum[s]/subjCounts[s];
     return `${s}: ${ctx.parsed} answers · avg ${avg.toFixed(0)}%`;
   }}}}}
 });
+
+// per-subject trend: compare the earlier half of that subject's answers to the more recent half
+function subjectTrend(s){
+  const rows = ANSWERS.filter(a=>a.paper===s).sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(rows.length<4) return null; // need enough answers for a first-half/second-half split to mean anything
+  const mid = Math.floor(rows.length/2);
+  const firstAvg = rows.slice(0,mid).reduce((s,a)=>s+a.marks/a.max*100,0)/mid;
+  const secondAvg = rows.slice(mid).reduce((s,a)=>s+a.marks/a.max*100,0)/(rows.length-mid);
+  const delta = secondAvg-firstAvg;
+  return Math.abs(delta)<3 ? {dir:'flat', glyph:'–'} : delta>0 ? {dir:'up', glyph:'▲'} : {dir:'down', glyph:'▼'};
+}
+
+const subjRanked = subjLabels.map(s=>({paper:s, avg: subjScoreSum[s]/subjCounts[s], n:subjCounts[s]}));
+const subjWeakest = subjRanked.slice().sort((a,b)=>a.avg-b.avg)[0];
+const subjHeaviest = subjRanked.slice().sort((a,b)=>b.n-a.n)[0];
 
 document.getElementById('subjectPerf').innerHTML = subjLabels.map(s=>{
   const count = subjCounts[s];
   const avg = subjScoreSum[s]/count;
   const share = Math.round(count/totalAnswers*100);
   const tier = scoreTier(avg);
-  return `<div class="subj-leg-row">
+  const trend = subjectTrend(s);
+  const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${s} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
+  const focusTag = s===subjWeakest.paper ? `<span class="subj-focus-tag">Focus</span>` : '';
+  return `<div class="subj-leg-row" data-subj="${s}">
     <div class="subj-leg-dot" style="background:${SUBJECT_COLORS[s]};"></div>
-    <div class="subj-leg-label"><b>${s}</b> <span class="subj-leg-count">${count} · ${share}%</span></div>
-    <div class="subj-leg-score" style="background:${tier.bg};color:${tier.fg};">${avg.toFixed(1)}</div>
+    <div class="subj-leg-label"><b>${s}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
+    ${trendHtml}
+    <div class="subj-leg-score" style="background:${tier.bg};color:${tier.fg};">${avg.toFixed(0)}%</div>
   </div>`;
 }).join('');
 
-const subjRanked = subjLabels.map(s=>({paper:s, avg: subjScoreSum[s]/subjCounts[s], n:subjCounts[s]}));
-const subjWeakest = subjRanked.slice().sort((a,b)=>a.avg-b.avg)[0];
-const subjHeaviest = subjRanked.slice().sort((a,b)=>b.n-a.n)[0];
-document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%. Ring size = share of practice, score badge = where marks are actually landing.`;
+function jumpToSubject(s){
+  raSubjSelect.value = s;
+  renderRecent();
+  document.getElementById('trendSubjFilter').value = s;
+  renderScoreTrend();
+  document.getElementById('recentList').scrollIntoView({behavior:'smooth', block:'center'});
+}
+document.querySelectorAll('#subjectPerf [data-subj]').forEach(row=>{
+  row.addEventListener('click', ()=> jumpToSubject(row.dataset.subj));
+});
+
+// coverage-balance check: papers should get roughly equal Mains weight, so flag lopsided practice
+const idealShare = 100/subjLabels.length;
+const mostSkewed = subjRanked.slice().sort((a,b)=> Math.abs((b.n/totalAnswers*100)-idealShare) - Math.abs((a.n/totalAnswers*100)-idealShare))[0];
+const mostSkewedShare = Math.round(mostSkewed.n/totalAnswers*100);
+const isUnderPracticed = mostSkewedShare < idealShare*0.6;
+const balanceNote = subjLabels.length>=3 && Math.abs(mostSkewedShare-idealShare)>15
+  ? ` ${isUnderPracticed ? `<b>${mostSkewed.paper}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${mostSkewed.paper}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
+  : '';
+document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
 
 /* ---------- score trend line (functional filter: range + subject) ---------- */
 const sortedAll = [...ANSWERS].sort((a,b)=> new Date(a.date)-new Date(b.date));
@@ -778,12 +843,13 @@ renderRecent();
 raSubjSelect.addEventListener('change', renderRecent);
 document.getElementById('raSort').addEventListener('change', renderRecent);
 document.getElementById('raLimit').addEventListener('change', renderRecent);
-document.getElementById('raDateChipClear').addEventListener('click', ()=>{ raDateFilter=null; renderRecent(); });
+document.getElementById('raDateChipClear').addEventListener('click', ()=>{ raDateFilter=null; renderRecent(); renderCalendar(); renderCalDayDetail(); });
 
 /* ---------- consistency calendar (functional month nav) ---------- */
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const latestAnswerDate = ANSWERS.length ? new Date(ANSWERS[0].date) : AnswerOSData.today();
 let calYear = latestAnswerDate.getFullYear(), calMonth = latestAnswerDate.getMonth();
+const TODAY_KEY = AnswerOSData.today().toISOString().slice(0,10);
 function renderCalendar(){
   const first = new Date(calYear,calMonth,1);
   const startDow = (first.getDay()+6)%7; // Mon=0
@@ -800,8 +866,10 @@ function renderCalendar(){
         const c = countByDay[day]||0;
         const cls = c===0?'cal-0':c===1?'cal-1':c===2?'cal-2':'cal-3';
         const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const clickable = c>0 ? `data-date="${dateStr}" style="cursor:pointer;"` : '';
-        html += `<td><div class="cal-cell ${cls}" ${clickable}>${day}</div></td>`;
+        const isToday = dateStr===TODAY_KEY ? 'today' : '';
+        const isSelected = dateStr===raDateFilter ? 'selected' : '';
+        const clickable = c>0 ? `data-date="${dateStr}"` : '';
+        html += `<td><div class="day-cell ${cls} ${isToday} ${isSelected}" ${clickable}><span class="day-num">${day}</span></div></td>`;
       }
       day++;
     }
@@ -810,14 +878,33 @@ function renderCalendar(){
   }
   document.getElementById('calTable').innerHTML = html;
   document.getElementById('calMonth').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
-  document.querySelectorAll('#calTable .cal-cell[data-date]').forEach(cell=>{
+  document.querySelectorAll('#calTable .day-cell[data-date]').forEach(cell=>{
     cell.addEventListener('click', ()=>{
       raDateFilter = (raDateFilter === cell.dataset.date) ? null : cell.dataset.date;
       renderRecent();
+      renderCalendar();
+      renderCalDayDetail();
     });
   });
 }
+function renderCalDayDetail(){
+  const box = document.getElementById('calDayDetail');
+  if(!raDateFilter){
+    box.innerHTML = `<div class="cdd-empty">Click a day to see what you wrote — also filters Recent Answers.</div>`;
+    return;
+  }
+  const rows = ANSWERS.filter(a=>a.date===raDateFilter);
+  const dLabel = new Date(raDateFilter).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  if(!rows.length){ box.innerHTML = `<div class="cdd-date">${dLabel}</div><div class="cdd-empty">No answers logged this day.</div>`; return; }
+  box.innerHTML = `<div class="cdd-date">${dLabel} · ${rows.length} answer${rows.length>1?'s':''}</div>` +
+    rows.map(a=>{
+      const col = SUBJECT_COLORS[a.paper]||'#888';
+      const score = (a.marks/a.max*100).toFixed(0);
+      return `<div class="cdd-row"><span class="cdd-tag" style="background:${col}1a;color:${col};">${a.paper}</span><span class="cdd-topic">${a.subtopic}</span><span class="cdd-score">${score}%</span></div>`;
+    }).join('');
+}
 renderCalendar();
+renderCalDayDetail();
 document.getElementById('calPrev').addEventListener('click', ()=>{
   calMonth--; if(calMonth<0){ calMonth=11; calYear--; } renderCalendar();
 });
@@ -848,41 +935,98 @@ ANSWERS.forEach(a=>{
   if(!weekBucketMap[key]) weekBucketMap[key] = {monday:mon, scores:[]};
   weekBucketMap[key].scores.push(a.marks/a.max*100);
 });
-const allWeeks = Object.values(weekBucketMap).sort((a,b)=> a.monday-b.monday).map(w=>({
-  label: weekLabel(w.monday),
-  avg: w.scores.reduce((s,v)=>s+v,0)/w.scores.length,
-  n: w.scores.length
-}));
+// Fill every Monday between the first and last written week, even ones with
+// zero answers — otherwise a 2-week writing gap silently disappears from the
+// timeline instead of showing up as the gap it actually was.
+const sortedKeys = Object.keys(weekBucketMap).sort();
+const allWeeks = [];
+if(sortedKeys.length){
+  let cursor = new Date(weekBucketMap[sortedKeys[0]].monday);
+  const last = new Date(weekBucketMap[sortedKeys[sortedKeys.length-1]].monday);
+  while(cursor <= last){
+    const key = weekKey(cursor);
+    const bucket = weekBucketMap[key];
+    allWeeks.push({
+      label: weekLabel(cursor),
+      avg: bucket ? bucket.scores.reduce((s,v)=>s+v,0)/bucket.scores.length : null,
+      n: bucket ? bucket.scores.length : 0
+    });
+    cursor = new Date(cursor); cursor.setDate(cursor.getDate()+7);
+  }
+}
+function linearRegression(points){ // points: [{x,y}] with y possibly null (skipped)
+  const pts = points.filter(p=>p.y!=null);
+  if(pts.length<2) return null;
+  const n = pts.length;
+  const sx = pts.reduce((s,p)=>s+p.x,0), sy = pts.reduce((s,p)=>s+p.y,0);
+  const sxy = pts.reduce((s,p)=>s+p.x*p.y,0), sxx = pts.reduce((s,p)=>s+p.x*p.x,0);
+  const denom = n*sxx - sx*sx;
+  if(denom===0) return null;
+  const slope = (n*sxy - sx*sy)/denom;
+  const intercept = (sy - slope*sx)/n;
+  return {slope, intercept};
+}
 let improveChart = null;
 function renderImprovement(){
   const periodVal = document.getElementById('improvePeriod').value;
   const shown = periodVal==='all' ? allWeeks : allWeeks.slice(-parseInt(periodVal));
-  document.getElementById('improveSub').textContent = shown.length>1 ? `vs week of ${shown[0].label}` : 'Not enough weeks yet';
-  if(shown.length < 2){
+  const written = shown.filter(w=>w.avg!=null);
+  document.getElementById('improveSub').textContent = written.length>1 ? `vs week of ${written[0].label}` : 'Not enough weeks yet';
+  if(written.length < 2){
     document.getElementById('improveVal').textContent = '—';
   } else {
-    const delta = Math.round(shown[shown.length-1].avg - shown[0].avg);
+    const delta = Math.round(written[written.length-1].avg - written[0].avg);
     document.getElementById('improveVal').textContent = (delta>=0?'+':'') + delta + '%';
     document.getElementById('improveVal').style.color = delta >= 0 ? 'var(--green-700)' : '#b3402c';
   }
-  const bars = shown.map((w,i)=> i===shown.length-1 ? '#2c8a46' : '#b8dfc4');
+
+  const targetPct = (AnswerOSData.getConfig().minScoreTarget || 6) * 10; // Settings stores this on a /10 scale
+  const reg = linearRegression(shown.map((w,i)=>({x:i, y:w.avg})));
+  const trendLine = reg ? shown.map((w,i)=> w.avg==null ? null : +(reg.slope*i + reg.intercept).toFixed(1)) : shown.map(()=>null);
+
+  const bars = shown.map((w)=> w.avg==null ? 'rgba(0,0,0,0)' : (w===written[written.length-1] ? '#2c8a46' : '#b8dfc4'));
   const cfg = {
     labels: shown.map(w=>w.label),
-    datasets:[{ data: shown.map(w=>+w.avg.toFixed(1)), backgroundColor:bars, borderRadius:6, maxBarThickness:34 }]
+    datasets:[
+      { type:'bar', data: shown.map(w=>w.avg==null?null:+w.avg.toFixed(1)), backgroundColor:bars, borderRadius:6, maxBarThickness:34, order:2 },
+      { type:'line', data: trendLine, borderColor:'#7a4fd5', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:0, fill:false, order:1 }
+    ]
   };
-  if(improveChart){ improveChart.data = cfg; improveChart.update(); }
-  else {
-    improveChart = new Chart(document.getElementById('improveBar'),{
-      type:'bar',
-      data:cfg,
-      options:{
-        plugins:{legend:{display:false}, tooltip:{callbacks:{
-          label:(ctx)=>{ const w = shown[ctx.dataIndex]; return `${ctx.parsed.y}% avg · ${w.n} answer${w.n>1?'s':''}`; }
-        }}},
-        scales:{y:{min:0,max:100,grid:{color:'#eef1ee'}}, x:{grid:{display:false}, ticks:{font:{size:9.5}}}}
+  const targetLinePlugin = {
+    id: 'targetLine',
+    afterDraw(chart){
+      const {ctx, chartArea, scales} = chart;
+      const y = scales.y.getPixelForValue(targetPct);
+      ctx.save();
+      ctx.strokeStyle = '#c98a1f'; ctx.setLineDash([3,3]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = '#8a6212'; ctx.font = '9px Inter, sans-serif';
+      ctx.fillText(`Target ${targetPct}%`, chartArea.right - 58, y - 5);
+      ctx.restore();
+    }
+  };
+  const options = {
+    plugins:{legend:{display:false}, tooltip:{callbacks:{
+      label:(ctx)=>{
+        if(ctx.dataset.type==='line') return `Trend: ${ctx.parsed.y}%`;
+        const w = shown[ctx.dataIndex];
+        return w.avg==null ? 'No answers this week' : `${ctx.parsed.y}% avg · ${w.n} answer${w.n>1?'s':''}`;
       }
-    });
+    }}},
+    scales:{y:{min:0,max:100,grid:{color:'#eef1ee'}}, x:{grid:{display:false}, ticks:{font:{size:9.5}}}}
+  };
+  if(improveChart){ improveChart.data = cfg; improveChart.options = options; improveChart.update(); }
+  else {
+    improveChart = new Chart(document.getElementById('improveBar'), {data:cfg, options, plugins:[targetLinePlugin]});
   }
+
+  const gapWeeks = shown.filter(w=>w.avg==null).length;
+  const weeksAboveTarget = written.filter(w=>w.avg>=targetPct).length;
+  const trendWord = reg==null ? 'not enough data yet' : reg.slope>0.5 ? 'trending up' : reg.slope<-0.5 ? 'trending down' : 'roughly flat';
+  document.getElementById('improveInsight').innerHTML =
+    `<b>${trendWord === 'not enough data yet' ? 'Trend' : 'Trend line'}</b> (purple, dashed) is ${trendWord} across these weeks. ` +
+    `${written.length ? `${weeksAboveTarget}/${written.length} weeks cleared your ${targetPct}% target (amber line).` : ''} ` +
+    `${gapWeeks>0 ? `${gapWeeks} week${gapWeeks>1?'s':''} with no answers logged — shown as a gap, not a zero.` : ''}`;
 }
 renderImprovement();
 document.getElementById('improvePeriod').addEventListener('change', renderImprovement);
@@ -982,7 +1126,7 @@ document.getElementById('focusArea').innerHTML = `
 `;
 
 /* ---------- bottom strip ---------- */
-const bottomIconMap = {plus:'plus', redo:'refresh', trend:'trendUp', clip:'clipboard', time:'clock'};
+const bottomIconMap = {plus:'plus', redo:'refresh', notes:'notes', clip:'clipboard', time:'clock'};
 const thisWeekCount = ANSWERS.filter(a=>{
   const d = new Date(a.date);
   const now = AnswerOSData.today();
@@ -993,19 +1137,40 @@ function daysUntil(dateStr){ if(!dateStr) return null; return Math.round((new Da
 const prelimsDays = daysUntil(examCfg.prelims);
 const mainsDays = daysUntil(examCfg.mains);
 function fmtExamDate(dateStr){ if(!dateStr) return '—'; const d = new Date(dateStr); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+
+// real Revision Hub progress, pulled from the same persisted store Revision Hub itself uses
+const revisionState = AnswerOSData.getRevisionState ? AnswerOSData.getRevisionState() : {};
+const revisionEntries = Object.values(revisionState);
+const reviewedCount = revisionEntries.filter(r=>r.reviewed).length;
+const dueCount = revisionEntries.filter(r=>{
+  if(!r.reviewed || !r.nextDue) return false;
+  return new Date(r.nextDue) <= AnswerOSData.today();
+}).length;
+const revisionsSub = totalAnswers===0 ? 'No answers yet'
+  : reviewedCount===0 ? 'Not started — visit Revision Hub'
+  : dueCount>0 ? `${dueCount} due right now` : 'All caught up';
+
+// real Notes coverage, pulled from the Notes page's persisted store
+const savedNotes = AnswerOSData.getNotes ? AnswerOSData.getNotes() : [];
+const notesSubtopics = new Set(savedNotes.map(n=>n.subtopic)).size;
+const notesSub = savedNotes.length===0 ? 'None yet — visit Notes' : `Across ${notesSubtopics} subtopic${notesSubtopics===1?'':'s'}`;
+
 const bottomData = [
   ['plus', thisWeekCount, "This Week's Answers", thisWeekCount>=2 ? 'On pace for the weekly goal' : 'Behind pace — write more this week'],
-  ['redo','35','Revisions Done','Sample — not tracked yet'],
-  ['trend','Mixed','Answer Quality Trend','+4% overall, dipped last 2'],
+  ['redo', `${reviewedCount}/${totalAnswers}`, 'Revisions Started', revisionsSub],
+  ['notes', savedNotes.length, 'Notes Indexed', notesSub],
   ['clip', prelimsDays==null?'—':prelimsDays, 'Prelims Countdown', `Days to ${fmtExamDate(examCfg.prelims)}`],
   ['time', mainsDays==null?'—':mainsDays, 'Mains Countdown', `Days to ${fmtExamDate(examCfg.mains)}`],
 ];
-document.getElementById('bottomStrip').innerHTML = bottomData.map(([ic,val,label,delta])=>`
-  <div class="strip-item">
+const bottomLinks = {redo:'answeros-revision-hub.html', notes:'answeros-notes.html'};
+document.getElementById('bottomStrip').innerHTML = bottomData.map(([ic,val,label,delta])=>{
+  const href = bottomLinks[ic];
+  const tag = href ? 'a' : 'div';
+  return `<${tag} ${href?`href="${href}"`:''} class="strip-item" ${href?'style="text-decoration:none;color:inherit;cursor:pointer;"':''}>
     <div class="si-icon">${iconSVG(bottomIconMap[ic], 17)}</div>
     <div><div class="si-val">${val}</div><div class="si-label">${label}</div><div class="si-delta">${delta}</div></div>
-  </div>
-`).join('');
+  </${tag}>`;
+}).join('');
 
 /* ---------- Refresh from Sheet trigger ---------- */
 document.getElementById('refreshBtn').addEventListener('click', async ()=>{
