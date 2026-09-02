@@ -1,0 +1,18 @@
+{
+  "primary_bottleneck": "",
+  "secondary_bottleneck": "",
+  "strengths": [],
+  "current_intervention": {
+    "action": "",
+    "started_at": null,
+    "answers_completed": 0,
+    "target_answers": 3,
+    "success_metric": "",
+    "status": "inactive"
+  },
+  "last_diagnosis_at": null,
+  "last_processed_answer_id": null,
+  "recent_patterns": [],
+  "retired_interventions": [],
+  "notes": "Authoritative longitudinal mentor state. Store server-side, not only in browser localStorage."
+}
