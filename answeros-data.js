@@ -18,7 +18,6 @@
     const text=String(value||'').trim();
     if(!text)return {strength:'',gap:'',fix:''};
     const clean=s=>String(s||'').trim().replace(/^[-–—:\s]+/,'').trim();
-    // Handles both newline-separated and inline formats such as "- Strength: ... - Gap: ... - Fix: ...".
     const normalize=s=>String(s||'').replace(/\s+/g,' ').trim();
     const extract=(label,nextLabels)=>{
       const next=nextLabels.join('|');
@@ -32,6 +31,36 @@
     };
   }
   function deriveGapCategory(row){const text=[row['Missing / Extra Improvements'],row['Overall Feedback'],row['My One Learning']].filter(Boolean).join(' ').toLowerCase();if(/example|data|quantif|statistic/.test(text))return 'Examples & Data';if(/judgment|article|constitutional|legal|statut/.test(text))return 'Legal/Institutional Backing';if(/analysis|analytical|critical|depth|causal/.test(text))return 'Critical Analysis';if(/directive|demand/.test(text))return 'Demand/Directive';if(/intro/.test(text))return 'Introduction';if(/conclusion/.test(text))return 'Conclusion';if(/technical|scientific|mechanism/.test(text))return 'Technical Precision';return 'Content/Depth';}
+
+  // Accept a Drive URL, a HYPERLINK formula, or a raw Drive file ID.
+  // This lets the Sheet's "Checked Copy" column override the original PDF
+  // without changing the existing PDF Link / PDF ID fallback logic.
+  function extractDriveFileId(value){
+    const text=String(value==null?'':value).trim();
+    if(!text)return '';
+    const hyperlink=text.match(/HYPERLINK\(\s*["']([^"']+)["']/i);
+    const source=hyperlink?hyperlink[1]:text;
+    const patterns=[
+      /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
+      /drive\.google\.com\/open\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+      /[?&]id=([a-zA-Z0-9_-]+)/i
+    ];
+    for(const pattern of patterns){const match=source.match(pattern);if(match)return match[1];}
+    if(/^[a-zA-Z0-9_-]{20,}$/.test(source))return source;
+    return '';
+  }
+
+  function getCheckedCopyValue(row){
+    // Primary column requested by the user, with harmless aliases supported.
+    return String(
+      row['Checked Copy'] ||
+      row['Checked Copy Link'] ||
+      row['Checked Copy PDF'] ||
+      row['Checked Copy ID'] ||
+      ''
+    ).trim();
+  }
+
   function normalizeRow(row,index){
     row=row||{};
     const date=toDateString(row['Question Date']);
@@ -43,8 +72,20 @@
     const demandItems=parseDemand(row['Demand of the Question']);
     const improvements=parseImprovements(row['Missing / Extra Improvements']);
     const parsedFeedback=parseOverallFeedback(row['Overall Feedback']);
-    const pdfLink=String(row['PDF Link']||'').trim();
-    const pdfId=String(row['PDF ID']||'').trim();
+
+    const originalPdfLink=String(row['PDF Link']||'').trim();
+    const originalPdfId=String(row['PDF ID']||'').trim();
+
+    // NEW PRIORITY:
+    // 1. If Checked Copy is populated, use it.
+    // 2. Otherwise use the existing PDF Link / PDF ID logic unchanged.
+    const checkedCopy=getCheckedCopyValue(row);
+    const checkedCopyId=extractDriveFileId(checkedCopy);
+    const hasCheckedCopy=Boolean(checkedCopy && (checkedCopyId || /https?:\/\//i.test(checkedCopy)));
+
+    const pdfLink=hasCheckedCopy ? checkedCopy : originalPdfLink;
+    const pdfId=hasCheckedCopy ? (checkedCopyId || originalPdfId) : originalPdfId;
+
     return Object.assign({},row,{
       id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
       date,
@@ -77,6 +118,9 @@
       pdf:pdfLink,
       pdfUrl:pdfLink,
       pdfDate:date,
+      checkedCopy,
+      checkedCopyId,
+      usingCheckedCopy:hasCheckedCopy,
       feedback:{
         strength:parsedFeedback.strength || '',
         gap:parsedFeedback.gap || '',
