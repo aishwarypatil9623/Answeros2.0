@@ -1,0 +1,4239 @@
+/************************************************************
+ * SUPERKALAM → GEMINI → GOOGLE SHEETS
+ * UPSC MAINS ANSWER ANALYTICS SYSTEM
+ *
+ * VERSION 3 — adds:
+ *   - Word Count + Marks cross-check (regex, no extra Gemini cost)
+ *   - Section-wise feedback (Intro / Body / Conclusion)
+ *   - Ideal Subheadings (structural scaffold for the answer)
+ *   - Must-Have Points (checklist to fully satisfy question demand)
+ *   - doGet() Web App endpoint for AnswerOS live sync
+ *   - Sheet auto-sorts newest-first after EVERY write (success + failure)
+ *   - Reordered columns for max scanning utility
+ *   - Marks Verified moved to the last column
+ *
+ * PIPELINE:
+ *
+ * SuperKalam PDF
+ *      ↓
+ * Extract PDF text
+ *      ↓
+ * Extract question date from filename
+ *      ↓
+ * Regex-extract Word Count + Marks (ground truth, no LLM)
+ *      ↓
+ * Gemini 3.5 Flash-Lite
+ *      ↓
+ * (on transient error → 15-minute fallback)
+ *      ↓
+ * Gemini 3.5 Flash
+ *      ↓
+ * UPSC answer analysis + enrichment + section-wise feedback
+ *      ↓
+ * Google Sheet (auto-sorted newest first)
+ *
+ * IMPORTANT:
+ * - NO Google Search grounding
+ * - NO web search
+ * - NO model/topper-copy claims
+ * - Gemini uses:
+ *      A. Your answer
+ *      B. SuperKalam evaluation
+ *      C. Gemini's UPSC knowledge
+ * - Original PDFs are retained
+ ************************************************************/
+
+
+/***********************
+ * 1. CONFIGURATION
+ ***********************/
+
+const CONFIG = {
+
+  // Your Google Sheet ID (unused by getSheet(), which uses the
+  // active spreadsheet — kept here only for reference/future use)
+  SPREADSHEET_ID:
+    '1DXc1U3jgYcGPQSs4BLrY90BoVWGGHSnUx8q659Qk4J0',
+
+  // Sheet/tab name
+  SHEET_NAME:
+    'Answers',
+
+  // SuperKalam PDF folder
+  PDF_FOLDER_ID:
+    '1XbsY4ZWZgArFJJZfOgrjiDDzUZTxzYvb',
+
+  // Gemini primary model
+  MODEL:
+    'gemini-3.5-flash-lite',
+
+  // Gemini fallback model — used only after a transient error
+  FALLBACK_MODEL:
+    'gemini-3.5-flash',
+
+  // One attempt per model.
+  // Primary model is tried first; fallback is used only after
+  // a transient primary-model error and a 15-minute delay.
+  MAX_RETRIES:
+    1,
+
+  // Keep original PDFs
+  TEST_MODE:
+    true,
+
+  DELETE_ORIGINAL_AFTER_SUCCESS:
+    false,
+
+  // Temporary OCR documents
+  TEMP_DOC_PREFIX:
+    '__SK_TEMP_OCR__',
+
+  // Maximum PDFs processed per execution
+  MAX_FILES_PER_RUN:
+    5
+};
+
+
+/***********************
+ * 2. FINAL SHEET HEADERS
+ *
+ * Grouped by scanning utility:
+ *   1–9   Identity + performance snapshot
+ *   10–11 The question itself
+ *   12–17 Diagnostics (what went wrong)
+ *   18–25 Revision-ready material (what to reuse/memorise)
+ *   26–28 Meta (PDF link/id/status)
+ *   29    Marks Verified — last, as requested
+ ***********************/
+
+const HEADERS = [
+
+  'Question Date',
+  'Paper',
+  'Subject',
+  'Subtopic',
+  'Directive',
+
+  'Marks',
+  'Max Marks',
+  '% of Demand Addressed',
+  'Word Count',
+
+  'Question',
+  'Demand of the Question',
+
+  'Intro Feedback',
+  'Body Feedback',
+  'Conclusion Feedback',
+  'Overall Feedback',
+  'Missing / Extra Improvements',
+  'Topper Edge',
+
+  'Best Introduction',
+  'Ideal Subheadings',
+  'Must-Have Points',
+  'Best Conclusion',
+  'Value Additions',
+  'Essential Keywords',
+  'Examples/Data',
+  'My One Learning',
+
+  'PDF Link',
+  'PDF ID',
+  'Status',
+
+  'Marks Verified'
+
+];
+
+
+/***********************
+ * 3. MAIN PROCESSING
+ ***********************/
+
+function processSuperKalamAnswers() {
+
+  const lock =
+    LockService.getScriptLock();
+
+  try {
+
+    lock.waitLock(30000);
+
+    console.log(
+      '=========================================='
+    );
+
+    console.log(
+      'SUPERKALAM PROCESSING STARTED'
+    );
+
+    console.log(
+      '=========================================='
+    );
+
+
+    const apiKey =
+      getGeminiApiKey();
+
+
+    if (!apiKey) {
+
+      throw new Error(
+        'Gemini API key not found. Add GEMINI_API_KEY to Script Properties.'
+      );
+
+    }
+
+
+    const sheet =
+      getSheet();
+
+
+    ensureHeaders(
+      sheet
+    );
+
+
+    const processedIds =
+      getProcessedPdfIds(
+        sheet
+      );
+
+    const retryPendingIds =
+      getRetryPendingPdfIds(
+        sheet
+      );
+
+
+    const folder =
+      DriveApp.getFolderById(
+        CONFIG.PDF_FOLDER_ID
+      );
+
+
+    const files =
+      folder.getFilesByType(
+        MimeType.PDF
+      );
+
+
+    let processed = 0;
+    let skipped = 0;
+    let failed = 0;
+
+
+    while (
+      files.hasNext() &&
+      processed < CONFIG.MAX_FILES_PER_RUN
+    ) {
+
+      const file =
+        files.next();
+
+
+      const fileId = file.getId();
+
+
+      const fileName =
+        file.getName();
+
+
+      console.log(
+        '------------------------------------------'
+      );
+
+
+      console.log(
+        'PDF FOUND: ' +
+        fileName
+      );
+
+
+      /*
+       * Duplicate protection
+       */
+
+      if (
+        processedIds.has(
+          fileId
+        )
+      ) {
+
+        console.log(
+          'Already processed: ' +
+          fileName
+        );
+
+        skipped++;
+
+        continue;
+      }
+
+      /*
+       * A PDF waiting for the 15-minute fallback must not
+       * be picked up by the normal primary-model run.
+       */
+      if (
+        retryPendingIds.has(
+          fileId
+        )
+      ) {
+
+        console.log(
+          'Waiting for fallback retry: ' +
+          fileName
+        );
+
+        skipped++;
+
+        continue;
+      }
+
+
+      try {
+
+        processSinglePdf(
+          file,
+          sheet,
+          apiKey
+        );
+
+
+        processed++;
+
+
+        console.log(
+          'PROCESSING SUCCESSFUL: ' +
+          fileName
+        );
+
+
+      } catch (error) {
+
+        failed++;
+
+
+        console.error(
+          'PROCESSING FAILED: ' +
+          fileName +
+          ' | ' +
+          error.message
+        );
+
+
+        writeFailureRow(
+          sheet,
+          file,
+          error
+        );
+
+      }
+
+    }
+
+
+    console.log(
+      '=========================================='
+    );
+
+    console.log(
+      'FINISHED'
+    );
+
+    console.log(
+      'Processed: ' +
+      processed
+    );
+
+    console.log(
+      'Skipped: ' +
+      skipped
+    );
+
+    console.log(
+      'Failed: ' +
+      failed
+    );
+
+    console.log(
+      '=========================================='
+    );
+
+
+  } finally {
+
+    try {
+
+      lock.releaseLock();
+
+    } catch (e) {}
+
+  }
+
+}
+//TEST FUNCTION//
+function testOnePdf() {
+
+  const apiKey =
+    getGeminiApiKey();
+
+  const sheet =
+    getSheet();
+
+  ensureHeaders(sheet);
+
+  const processedIds =
+    getProcessedPdfIds(sheet);
+
+  const folder =
+    DriveApp.getFolderById(
+      CONFIG.PDF_FOLDER_ID
+    );
+
+  const files =
+    folder.getFilesByType(
+      MimeType.PDF
+    );
+
+  if (!files.hasNext()) {
+    throw new Error(
+      'No PDF found in the SuperKalam folder.'
+    );
+  }
+
+  const file =
+    files.next();
+
+  const fileId =
+    file.getId();
+
+  console.log(
+    'TESTING ONE PDF: ' +
+    file.getName()
+  );
+
+  if (processedIds.has(fileId)) {
+
+    console.log(
+      'This PDF is already processed. Test stopped.'
+    );
+
+    return;
+  }
+
+  processSinglePdf(
+    file,
+    sheet,
+    apiKey
+  );
+
+  console.log(
+    'ONE-PDF TEST COMPLETED.'
+  );
+}
+/***********************
+ * 4. PROCESS ONE PDF
+ ***********************/
+
+function processSinglePdf(
+  file,
+  sheet,
+  apiKey,
+  modelName
+) {
+
+  const pdfLink = `=HYPERLINK("${file.getUrl()}","${file.getName()}")`;
+
+
+  const fileName =
+    file.getName();
+
+
+  /*
+   * Extract date from filename
+   */
+
+  const filenameDate =
+    extractDateFromFilename(
+      fileName
+    );
+
+
+  console.log(
+    'DATE FROM FILENAME: ' +
+    filenameDate
+  );
+
+
+  /*
+   * Extract PDF text
+   */
+
+  const pdfText =
+    extractPdfText(
+      file
+    );
+
+
+  if (
+    !pdfText ||
+    pdfText.trim().length < 100
+  ) {
+
+    throw new Error(
+      'PDF text extraction failed or returned insufficient text.'
+    );
+
+  }
+
+
+  console.log(
+    'TEXT LENGTH: ' +
+    pdfText.length
+  );
+
+
+  /*
+   * Regex-extract Word Count + Marks BEFORE Gemini.
+   * These come straight from SuperKalam's own PDF text —
+   * no LLM transcription risk.
+   */
+
+  const wordCount =
+    extractWordCountFromText(
+      pdfText
+    );
+
+
+  const extractedMarks =
+    extractMarksFromText(
+      pdfText
+    );
+
+
+  console.log(
+    'WORD COUNT (regex): ' +
+    wordCount
+  );
+
+
+  console.log(
+    'MARKS (regex): ' +
+    extractedMarks.marks +
+    '/' +
+    extractedMarks.max
+  );
+
+
+  console.log(
+    'Sending evaluation to Gemini...'
+  );
+
+
+  /*
+   * Gemini analysis
+   */
+
+  const result =
+    callGemini(
+      apiKey,
+      pdfText,
+      filenameDate,
+      modelName || CONFIG.MODEL
+    );
+
+
+  console.log(
+    'Gemini analysis completed.'
+  );
+
+
+  /*
+   * Cross-check Gemini's marks against the regex-extracted
+   * ground truth from the PDF itself.
+   */
+
+  const marksVerified =
+    extractedMarks.marks === '' ? 'N/A' :
+    (String(extractedMarks.marks) === String(result.marks) &&
+     String(extractedMarks.max) === String(result.max_marks)) ? 'MATCH' : 'MISMATCH';
+
+
+  if (marksVerified === 'MISMATCH') {
+
+    console.warn(
+      'MARKS MISMATCH — Gemini: ' +
+      result.marks + '/' + result.max_marks +
+      ' | PDF regex: ' +
+      extractedMarks.marks + '/' + extractedMarks.max
+    );
+
+  }
+
+
+  /*
+   * Build Sheet row
+   */
+
+  const row =
+  buildSheetRow(
+    result,
+    pdfLink,
+    file.getId(),
+    wordCount,
+    marksVerified
+  );
+
+
+  sheet.appendRow(
+    row
+  );
+  
+const writtenRow = sheet.getLastRow();
+
+for (let col = 1; col <= row.length; col++) {
+  formatRecallHighlights(
+    sheet,
+    writtenRow,
+    col,
+    row[col - 1]
+  );
+}
+
+  console.log(
+    'SUCCESSFULLY WRITTEN TO SHEET'
+  );
+
+
+  /*
+   * Keep the sheet sorted newest-first after every
+   * successful write, not just after failures.
+   */
+
+  sortAnswersByDate(
+    sheet
+  );
+
+
+  console.log(
+    'SHEET RE-SORTED BY DATE'
+  );
+
+
+  /*
+   * Delete temporary OCR document
+   */
+
+  cleanupTemporaryDocuments();
+
+
+  console.log(
+    'TEMP DOC DELETED'
+  );
+
+
+  /*
+   * Original PDF retained
+   */
+
+  console.log(
+    'ORIGINAL PDF RETAINED — TEST MODE'
+  );
+
+}
+
+
+/***********************
+ * 5. GEMINI PROMPT
+ ***********************/
+
+function buildPrompt(
+  pdfText,
+  filenameDate
+) {
+
+  return `
+
+You are my UPSC Civil Services Mains answer-writing analyst.
+
+You are analysing ONE SuperKalam DMQ answer-evaluation PDF.
+
+IMPORTANT:
+The PDF contains ONLY:
+1. The user's actual answer.
+2. SuperKalam's evaluation/feedback/suggestions.
+3. Marks and related evaluation information.
+
+The PDF does NOT contain model answers or topper copies.
+
+Therefore:
+- Do NOT claim that you saw a topper copy.
+- Do NOT claim that you saw a model answer.
+- Do NOT fabricate comparison with an unseen topper copy.
+- You MAY use your own UPSC knowledge to create "topper-style" enrichment.
+- Clearly treat such enrichment as your own analytical recommendation.
+
+====================================================
+SUBJECT — PDF SOURCE OF TRUTH
+====================================================
+
+The Subject MUST be taken exactly from the Subject mentioned in
+the PDF.
+
+Do NOT infer, reinterpret, rename, broaden, narrow, or modify it.
+
+The Subject mentioned in the PDF is the FINAL Subject.
+
+Your Subtopic classification MUST NOT change the Subject.
+
+If the PDF says:
+Subject: Polity
+
+Return:
+Subject: Polity
+
+Even if the selected UPSC syllabus Subtopic is:
+2.5 Parliament and State Legislatures
+
+NEVER replace the PDF Subject with the syllabus Subtopic.
+
+====================================================
+
+SUBTOPIC RULE — STRICT UPSC SYLLABUS ONLY  only for the 
+
+Identify the question's Subtopic ONLY from the indexed UPSC syllabus below.
+
+RULES:
+
+* Select ONE and ONLY ONE item from the index.
+* Return the EXACT number + EXACT wording.
+* Do NOT invent, rename, paraphrase, combine, or create a new topic.
+* Do NOT use current-affairs topics or Gemini's own categories.
+* Choose the syllabus line that BEST represents the question's PRIMARY demand.
+* If no item fits confidently, return: "Not confidently mapped".
+* Output ONLY the selected syllabus item; no explanation.
+
+INDEXED UPSC SYLLABUS:
+
+GS1
+1.1 Art Forms, Literature and Architecture
+1.2 Modern Indian History
+1.3 Freedom Struggle
+1.4 Post-Independence Consolidation and Reorganization
+1.5 World History
+1.6 Political Philosophies
+1.7 Salient Features of Indian Society and Diversity of India
+1.8 Role of Women and Women's Organizations
+1.9 Population and Associated Issues
+1.10 Poverty and Developmental Issues
+1.11 Urbanization, Problems and Remedies
+1.12 Effects of Globalization on Indian Society
+1.13 Social Empowerment
+1.14 Communalism
+1.15 Regionalism
+1.16 Secularism
+1.17 World's Physical Geography
+1.18 Distribution of Natural Resources
+1.19 Location of Industries
+1.20 Geophysical Phenomena
+1.21 Geographical Features and Their Changes
+1.22 Flora and Fauna and Effects of Their Changes
+
+GS2
+2.1 Indian Constitution
+2.2 Federal Structure
+2.3 Separation of Powers
+2.4 Comparison of Indian Constitutional Scheme with Other Countries
+2.5 Parliament and State Legislatures
+2.6 Executive and Judiciary
+2.7 Ministries, Departments, Pressure Groups and Associations
+2.8 Representation of People's Act
+2.9 Constitutional Posts and Bodies
+2.10 Statutory, Regulatory and Quasi-Judicial Bodies
+2.11 Government Policies and Interventions
+2.12 Development Processes, NGOs, SHGs and Stakeholders
+2.13 Welfare Schemes for Vulnerable Sections
+2.14 Protection and Betterment of Vulnerable Sections
+2.15 Social Sector and Services
+2.16 Poverty and Hunger
+2.17 Governance, Transparency and Accountability
+2.18 E-Governance
+2.19 Citizens' Charters
+2.20 Role of Civil Services in Democracy
+2.21 India and Its Neighbourhood
+2.22 Bilateral, Regional and Global Groupings and Agreements
+2.23 Policies and Politics of Developed and Developing Countries
+2.24 Indian Diaspora
+2.25 International Institutions, Agencies and Fora
+
+GS3
+3.1 Indian Economy, Planning, Resources, Growth, Development and Employment
+3.2 Inclusive Growth
+3.3 Government Budgeting
+3.4 Crops and Cropping Patterns
+3.5 Irrigation Systems
+3.6 Agricultural Storage, Transport and Marketing
+3.7 E-Technology for Farmers
+3.8 Farm Subsidies and MSP
+3.9 Public Distribution System
+3.10 Buffer Stocks and Food Security
+3.11 Technology Missions
+3.12 Economics of Animal Rearing
+3.13 Food Processing Industries
+3.14 Land Reforms
+3.15 Liberalization and Industrial Policy
+3.16 Infrastructure
+3.17 Investment Models
+3.18 Science and Technology Developments and Applications
+3.19 Achievements of Indians, Indigenization and New Technology
+3.20 IT, Space, Computers, Robotics, Nanotechnology and Biotechnology
+3.21 Intellectual Property Rights
+3.22 Conservation, Pollution and Environmental Degradation
+3.23 Environmental Impact Assessment
+3.24 Disaster and Disaster Management
+3.25 Development and Spread of Extremism
+3.26 External State and Non-State Actors in Internal Security
+3.27 Communication Networks, Media and Social Networking in Internal Security
+3.28 Cyber Security
+3.29 Money Laundering and Prevention
+3.30 Border Security
+3.31 Organized Crime and Terrorism
+3.32 Security Forces and Agencies
+
+GS4
+4.1 Ethics and Human Interface
+4.2 Human Values
+4.3 Attitude
+4.4 Aptitude and Foundational Values for Civil Service
+4.5 Emotional Intelligence
+4.6 Moral Thinkers and Philosophers
+4.7 Public/Civil Service Values and Ethics in Public Administration
+4.8 Ethical Concerns and Dilemmas
+4.9 Laws, Rules, Regulations and Conscience as Ethical Guidance
+4.10 Accountability and Ethical Governance
+4.11 Ethical and Moral Values in Governance
+4.12 Ethics in International Relations and Funding
+4.13 Corporate Governance
+4.14 Probity in Governance
+4.15 Information Sharing and Transparency
+4.16 Right to Information
+4.17 Codes of Ethics and Codes of Conduct
+4.18 Citizens' Charters
+4.19 Work Culture
+4.20 Quality of Service Delivery
+4.21 Utilization of Public Funds
+4.22 Corruption
+4.23 Case Studies
+
+FINAL CHECK:
+The answer MUST be an exact item from the index above.
+
+Example:
+Question on ethics in human actions → 4.1 Ethics and Human Interface
+
+Never output a topic that is not present in this index.
+
+
+====================================================
+QUESTION DATE
+====================================================
+
+The script extracted the date from the PDF filename:
+
+${filenameDate}
+
+Use this exact date in the Question Date field.
+
+Do NOT search the web.
+
+Do NOT infer the date from the PDF creation date.
+
+If the supplied date is "Not verified", return:
+"Not verified"
+
+
+===================================================
+RECALL HIGHLIGHTING:
+
+IMPORTANT:
+The ONLY valid highlighting syntax is:
+
+[MUST]term[/MUST]
+
+Never use [MUST] as a closing tag.
+Always close every MUST marker with [/MUST].
+
+Use [MUST] only for genuinely important items that should be memorised for answer writing.
+
+Prioritise:
+- Constitutional Articles / provisions
+- Laws / Acts
+- Schemes / Government programmes
+- Committees / Commissions
+- Important concepts / theories
+- Specific case studies
+- Important data/statistics
+- Unique keywords / phrases
+- Institutions or reports
+
+Do NOT highlight entire sentences.
+Do NOT highlight ordinary/common words.
+Maximum 3–5 MUST terms per relevant column.
+
+Example:
+[MUST]SFURTI[/MUST] → traditional-industry cluster development
+[MUST]Tirupur textile cluster[/MUST] → shared infrastructure and export competitiveness
+[MUST]Economies of agglomeration[/MUST] → technology spillovers and skill pooling
+====================================================
+SOURCE MATERIAL
+====================================================
+
+Use THREE sources:
+
+SOURCE A:
+The user's actual answer.
+
+SOURCE B:
+SuperKalam's evaluation, comments and suggestions.
+
+SOURCE C:
+Your own UPSC knowledge.
+
+For the final answer:
+
+SYNTHESISE the BEST useful material from A + B + C.
+
+Do NOT separately describe what came from A, B or C.
+
+The final output must be revision-ready.
+
+====================================================
+IMPORTANT UPSC PRINCIPLE
+====================================================
+
+Do not add information merely to make the answer look impressive.
+
+Every value addition must be genuinely relevant to the specific question.
+
+Possible value additions include:
+
+- Constitutional Articles
+- Constitutional provisions
+- Laws / Acts
+- Supreme Court judgments
+- Committees / Commissions
+- Government schemes
+- Government programmes
+- Institutions
+- Reports
+- Economic Survey data
+- Census data
+- International examples
+- Indian case studies
+- Contemporary examples
+- Thinkers
+- Concepts
+- Technical terminology
+- SDGs
+- Important indices
+- Institutional mechanisms
+- Relevant statistics
+
+But only include them when they materially improve THIS answer.
+
+Never force irrelevant facts.
+
+Never invent statistics.
+
+If uncertain about a factual claim, omit it.
+
+=====================================================
+DEMAND OF THE QUESTION
+====================================================
+
+Break the question into ONLY its distinct, meaningful demands.
+
+RULES:
+• Keep each demand extremely short — ideally 3–8 words.
+• Each demand MUST be on a separate bullet line.
+• Show the status FIRST using:
+  ✅ = adequately addressed
+  🔼 = partially addressed
+  ❌ = not addressed
+• Do NOT write explanations beside the status.
+• Do NOT repeat the full question.
+• Do NOT create artificial or overlapping demands.
+• Capture every substantive demand of the question.
+• Judge coverage based on substantive content, not mere mention.
+
+FORMAT EXACTLY:
+
+• ✅ Define / explain X
+• 🔼 Examine Y
+• ❌ Suggest reforms
+
+====================================================
+% DEMAND ADDRESSED
+====================================================
+
+Give ONE percentage.
+
+Calculate it as a reasoned estimate based on:
+• importance of each demand;
+• depth of coverage;
+• accuracy;
+• quality of analysis;
+• completeness.
+
+Do NOT simply count ✅ 🔼 ❌.
+
+FORMAT:
+
+65%
+
+====================================================
+DIRECTIVE
+====================================================
+
+Identify the exact UPSC directive.
+
+Examples:
+
+Discuss
+Examine
+Analyse
+Critically examine
+Evaluate
+Critically evaluate
+Assess
+Comment
+Elucidate
+Explain
+Enumerate
+
+====================================================
+BEST INTRODUCTION
+====================================================
+
+Create ONE powerful, reusable UPSC Mains introduction.
+
+IMPORTANT:
+- ONE line ONLY.
+- Maximum 25 words.
+- Prefer 12–18 words.
+- It should feel like a strong opening "hook".
+- Directly usable in a UPSC answer.
+- Easy to remember and reproduce.
+- Prefer a universal framing that can be adapted to similar questions.
+- Do NOT simply restate the question.
+- Do NOT explain the topic.
+- Do NOT pack multiple facts into one line.
+
+PREFER ONE strong hook:
+- Striking statistic
+- Paradox / contrast
+- Crisp definition
+- Contemporary hook
+- Conceptual framing
+- Constitutional value
+- Report/data reference
+- Short, relevant quotation
+
+SYNTHESIS:
+Use the strongest usable element from:
+- User's introduction
+- SuperKalam suggestions
+- Relevant UPSC knowledge
+
+But prioritise:
+HOOK > BREVITY > REUSABILITY.
+
+FORMAT:
+
+One crisp, memorable, examiner-catching sentence
+
+QUALITY TEST:
+
+"Would this opening immediately make the examiner interested
+and could I adapt it to another question on the same theme?"
+
+If NO → rewrite it.
+
+FINAL RULE:
+
+SHORT + CATCHY + MATURE + REUSABLE.
+
+====================================================
+IDEAL SUBHEADINGS
+====================================================
+
+Give the ideal structural subheadings this answer's BODY should
+have been organised under, based on the demands identified earlier.
+
+PURPOSE:
+This is a structural scaffold — not content. It shows how the
+answer should be organised so an examiner can navigate it easily.
+
+RULES:
+- 3–6 subheadings, ordered as they should appear in the answer.
+- Each subheading: 2–6 words.
+- Subheadings must map directly onto the demands of the question
+  (one subheading can cover one or more related demands).
+- Do NOT use generic labels like "Introduction", "Body", or
+  "Conclusion" — these are content subheadings, not structural
+  section names.
+- Do NOT write explanations — subheadings only.
+- Prefer subheadings that are themselves reusable across similar
+  questions (e.g. "Significance for X", "Challenges in Y",
+  "Way Forward").
+
+FORMAT:
+
+- Subheading one
+- Subheading two
+- Subheading three
+
+Example (for a question on Vikram-1 / India's space ecosystem):
+
+- Significance for India's Space Ecosystem
+- Technological & Policy Enablers
+- Challenges to Commercial Leadership
+- Way Forward
+
+====================================================
+MUST-HAVE POINTS
+====================================================
+
+List the SPECIFIC points that MUST appear somewhere in the answer
+for it to fully satisfy the question's demand — the checklist an
+examiner would tick off while awarding marks.
+
+PURPOSE:
+This is different from Value Additions. Value Additions are
+enrichments that make an already-complete answer stronger.
+Must-Have Points are the baseline — if these are missing, the
+answer cannot score well regardless of how well-written it is.
+
+RULES:
+- 4–7 points.
+- Each point must map directly onto one of the identified demands.
+- Each point should be a specific, concrete point — not a vague
+  theme (e.g. NOT "talk about challenges" but the actual challenge).
+- Use [MUST] highlighting on the core term in each point.
+- Maximum 15 words per point.
+- Do NOT repeat Value Additions or Examples/Data verbatim — if a
+  value addition IS also a must-have point, phrase it as the
+  underlying point here, not the illustrative example.
+- Do NOT pad to reach 7 — output only genuinely necessary points.
+
+FORMAT:
+
+- [MUST]Point[/MUST] — why it's essential to this demand
+
+Example:
+
+- [MUST]IN-SPACe framework[/MUST] — explains the regulatory enabler behind private launches
+- [MUST]Funding gap vs global peers[/MUST] — core barrier to commercial competitiveness
+- [MUST]Dedicated spaceport infrastructure[/MUST] — physical capacity constraint on scaling launches
+
+QUALITY TEST:
+
+"If this point is absent, does the answer fail to fully address
+the question's demand?"
+
+If NO → it belongs in Value Additions, not here.
+
+====================================================
+VALUE ADDITIONS
+====================================================
+
+Maximum 5 points.
+
+Purpose:
+Provide ONLY the highest-impact value additions that can genuinely improve the UPSC answer.
+
+Selection rules:
+- Value additions are NOT restricted to the user's answer or Gemini's suggestions.
+- Generate additional value additions when they are genuinely relevant.
+- Every point must directly strengthen the answer's demand.
+- Prioritise quality, relevance and memorability over quantity.
+- Do NOT dump facts merely to make the answer look content-rich.
+- Avoid repeating information already adequately covered elsewhere.
+- Prefer specific, UPSC-usable value additions over generic statements.
+- Do NOT repeat points already listed under Must-Have Points.
+
+Possible categories:
+- Constitutional Articles
+- Laws / Acts
+- Judgments
+- Committees / Commissions
+- Government Schemes
+- Policies / Missions
+- Reports / Indices
+- Reliable Data
+- Indian case studies
+- International examples
+- Institutions
+- Economic / political / sociological concepts
+- Thinkers / theories where genuinely relevant
+- Contemporary developments
+
+FORMAT — VERY IMPORTANT:
+
+Return exactly 3–5 separate bullet points.
+
+Each bullet must follow:
+
+- [MUST]VALUE-ADD[/MUST] — ONE concise line explaining exactly how it strengthens THIS question.
+
+- [MUST]VALUE-ADD[/MUST] — ONE concise line explaining exactly how it strengthens THIS question.
+
+
+Rules for each bullet:
+- Maximum ~25 words.
+- One line left blank after each point
+- Highlight ONLY the key term/value-add.
+- Keep the explanation concise and directly relevant.
+- Do not use multiple value-adds in one bullet.
+- Do not create sub-bullets.
+- Do not write a paragraph.
+- Do not use tables.
+- Do not use unnecessary labels such as "Relevance:", "Importance:", etc.
+
+QUALITY TEST:
+
+Before including a value addition, ask:
+"Can the aspirant directly insert this into this particular answer to make it stronger?"
+
+If NO → exclude it.
+
+PRIORITY:
+1. Highly question-specific value addition
+2. Strong Indian example/case study
+3. Government policy/scheme/institution
+4. Relevant constitutional/legal/institutional reference
+5. Useful data/report/concept
+
+====================================================
+ESSENTIAL KEYWORDS
+====================================================
+
+Maximum 5.
+
+Identify ONLY the most relevant UPSC keywords/phrases for THIS specific question.
+
+IMPORTANT:
+- Do NOT try to fill all 5 slots.
+- The number of keywords must depend entirely on relevance.
+- 1 excellent keyword is better than 5 mediocre keywords.
+- Output anywhere between 1 and 5 keywords.
+- If only 1–2 genuinely useful keywords exist, output only those.
+- Never add keywords merely to reach the maximum of 5.
+
+Purpose:
+Select terminology that:
+- captures the core analytical issue;
+- improves conceptual precision;
+- makes the answer sound mature and UPSC-oriented;
+- can be naturally inserted into the answer.
+
+PRIORITISE:
+- Core concepts
+- Technical terminology
+- Analytical frameworks
+- Constitutional / legal terminology
+- Economic / political / social concepts
+- Policy terminology
+- Institutional terminology
+- Question-specific expert terminology
+
+AVOID:
+- Generic words such as "development", "growth", "challenges", 
+  "government", "society", "economy", etc.
+- Merely copying words from the question unless they have genuine
+  analytical value.
+- Generic descriptive phrases.
+- Long sentences.
+- Examples, data, schemes or articles unless they function primarily
+  as a conceptual keyword.
+- Redundant or overlapping keywords.
+
+FORMAT:
+
+Return ONLY 1–5 bullet points:
+
+- [MUST]Keyword / Phrase[/MUST]
+
+- [MUST]Keyword / Phrase[/MUST]
+
+- [MUST]Keyword / Phrase[/MUST]
+
+- [MUST]Keyword / Phrase[/MUST]
+
+- [MUST]Keyword / Phrase[/MUST]
+
+
+QUALITY TEST:
+
+For every keyword ask:
+
+"Would using this exact term in my UPSC answer make my analysis
+more precise, conceptually stronger or examiner-friendly?"
+
+If NO → exclude it.
+
+FINAL RULE:
+
+RELEVANCE > QUANTITY.
+
+Do not manufacture keywords.
+Do not fill unused slots.
+Choose only the highest-value terminology.
+
+The output should function as a quick revision trigger:
+
+SEE → RECALL CONCEPT → USE IN ANSWER.
+
+====================================================
+EXAMPLES / DATA
+====================================================
+
+Maximum 5 points.
+
+Provide ONLY the most relevant examples and/or factual data that can
+directly strengthen THIS specific UPSC question.
+
+IMPORTANT:
+- Do NOT try to fill all 5 slots.
+- Output only what is genuinely useful.
+- 1 excellent example/data point is better than 5 mediocre ones.
+- Output anywhere between 1 and 5 points.
+- Never add an example or statistic merely to reach the maximum.
+
+PRIORITY ORDER:
+
+1. Highly relevant Indian examples
+2. Official Government data
+3. Economic Survey / RBI / NITI Aayog / Census / official reports
+4. Specific Indian case studies
+5. Relevant contemporary developments
+6. International comparisons ONLY when they add analytical value
+
+SELECTION RULES:
+
+- Every point must directly support a specific argument or dimension
+  of the question.
+- Prefer specific, verifiable facts over vague statements.
+- Prefer examples that demonstrate a mechanism, impact, success,
+  failure, challenge or policy outcome.
+- Data should be accompanied by what it demonstrates where useful.
+- Avoid repeating the same example or statistic in different forms.
+- Avoid generic examples that could fit almost any question.
+- Do not invent statistics, case studies or institutional claims.
+- If a reliable factual figure is uncertain, omit it rather than guess.
+
+LENGTH LIMIT:
+
+- Each point MUST be concise: ideally 12–25 words.
+- HARD MAXIMUM: 30 words per point.
+- Do not write explanations, background or long descriptions.
+- Include only the information that can actually be integrated into
+  a UPSC Mains answer.
+
+FORMAT:
+
+Return ONLY 1–5 separate bullet points.
+- One line left blank after each point
+
+Each point MUST follow:
+
+- [MUST][Example / Data][/MUST]— [what it demonstrates / how it can be used
+  in the answer]
+
+Examples:
+
+- [MUST]Tiruppur textile cluster[/MUST] — Shared infrastructure and specialised
+  networks improve MSME productivity and export competitiveness.
+
+- [MUST]Economic Survey 2025–26[/MUST] — MSMEs contribute ~31% of GDP, highlighting
+  their systemic importance to India's economy.
+
+- [MUST]Brazil's PIX[/MUST] — Shows how free retail payments can coexist with
+  sustainable commercial payment models.
+
+INTEGRATION TEST:
+
+For every point ask:
+
+"Can the aspirant directly insert this example/data into THIS answer
+to substantiate a specific argument?"
+
+If NO → exclude it.
+
+FINAL QUALITY FILTER:
+
+RELEVANCE > USABILITY > QUALITY > QUANTITY.
+
+Do not manufacture examples.
+Do not fill unused slots.
+Choose only the strongest evidence available.
+
+====================================================
+BEST CONCLUSION
+====================================================
+
+Create ONE short, reusable UPSC Mains conclusion.
+
+RULES:
+- ONE line ONLY.
+- Maximum 20 words.
+- Prefer 10–15 words.
+- Make it broad, optimistic and future-oriented.
+- Keep it easy to memorise and reproduce.
+- Synthesise the user's conclusion and SuperKalam feedback ONLY where useful.
+- Do NOT repeat arguments, examples, data or schemes from the answer.
+- Do NOT force question-specific facts.
+- Use constitutional values, inclusive development, institutional reform,
+  sustainable development, SDGs, Atmanirbhar Bharat or Viksit Bharat
+  ONLY when genuinely relevant.
+- Prefer a universal concluding thought that can be adapted across
+  similar UPSC questions.
+
+FORMAT:
+
+[One polished, memorable concluding sentence]
+
+QUALITY TEST:
+
+"Can I easily remember and reuse this conclusion in another
+UPSC answer on a similar theme?"
+
+If NO → simplify it.
+
+FINAL RULE:
+
+SHORT + MEMORABLE + FUTURE-ORIENTED + REUSABLE.
+
+====================================================
+MISSING / EXTRA IMPROVEMENTS
+====================================================
+
+Maximum 3 points.
+
+Identify ONLY the most important weaknesses or improvements needed
+to make THIS specific answer stronger.
+
+IMPORTANT:
+- Output anywhere between 0 and 3 points.
+- Do NOT force 3 points.
+- 1 highly relevant improvement is better than 3 weak ones.
+- If the answer is already strong in a particular area, do not invent
+  a weakness.
+- Do NOT repeat Value Additions, Examples/Data or Keywords.
+- Focus on what the USER needs to improve in their answer.
+
+FOCUS ONLY ON:
+- Missing dimension
+- Weak analysis / depth
+- Weak causality or linkage
+- Insufficient criticality
+- Generic argument
+- Missing stakeholder perspective
+- Missing counterargument / balance
+- Poor question-demand coverage
+- Weak conclusion / way forward
+- Poor presentation / structure
+
+LENGTH LIMIT:
+
+- Each point: ideally 8–15 words.
+- HARD MAXIMUM: 20 words.
+- Use concise, actionable language.
+- No explanations or paragraphs.
+
+FORMAT:
+
+Return ONLY 0–3 bullet points.
+- One line left blank after each point
+
+Each point MUST follow:
+
+- [MUST][Weakness][/MUST] → [specific improvement]
+
+- [MUST][Weakness][/MUST] → [specific improvement]
+
+Example:
+
+- [MUST]Generic productivity arguments[/MUST] → Link each benefit to a concrete cluster mechanism.
+
+- [MUST]Weak competitiveness analysis[/MUST] → Explain how clustering enables GVC integration and export scaling.
+
+QUALITY TEST:
+
+Ask:
+"What is the single most useful change the aspirant should make?"
+
+If the improvement does not materially improve the answer → exclude it.
+
+FINAL RULE:
+
+RELEVANCE > QUANTITY.
+
+Be brutally selective.
+Do not manufacture weaknesses.
+Do not repeat content from other columns.
+
+====================================================
+TOPPER EDGE
+====================================================
+
+Give ONE specific improvement that would make the answer noticeably stronger.
+
+It should answer:
+
+"What is the one thing I could do differently to make this answer look substantially better to a UPSC examiner?"
+
+ONE LINE ONLY.
+
+====================================================
+OVERALL FEEDBACK
+====================================================
+
+Maximum 3 bullet points.
+
+Give ONLY the most important diagnosis of THIS answer.
+
+- [MUST]Strength:[/MUST] [strongest aspect]
+- [MUST]Gap:[/MUST] [biggest weakness]
+- [MUST]Fix:[/MUST] [single highest-priority improvement]
+
+LENGTH:
+- Maximum 8 words per bullet.
+- Prefer 3–6 words.
+- No explanations.
+- No repetition of other columns.
+- Do not invent weaknesses.
+
+====================================================
+SECTION-WISE FEEDBACK (Intro / Body / Conclusion)
+====================================================
+
+If SuperKalam's evaluation gives separate feedback for the
+Introduction, Body and Conclusion, synthesise EACH into ONE line.
+
+If a section isn't evaluated separately, infer its single most
+important gap from the full evaluation.
+
+RULES PER SECTION:
+- Maximum 15 words.
+- Format: [MUST]Gap[/MUST] → [specific fix]
+- Only ONE gap per section.
+- Do NOT repeat Overall Feedback or Missing/Extra Improvements.
+
+Example:
+Intro: [MUST]No historical hook[/MUST] → Open with the policy reform that enabled this.
+Body: [MUST]Missing institutional link[/MUST] → Connect each point to the enabling framework.
+Conclusion: [MUST]No forward synthesis[/MUST] → End with a measurable national target.
+
+====================================================
+MY ONE LEARNING
+====================================================
+
+Give EXACTLY ONE bullet point.
+
+Purpose:
+Give the shortest possible actionable instruction that I should
+remember and apply to future answers.
+
+FORMAT:
+
+- Actionable instruction
+
+RULES:
+- Maximum 10 words.
+- Prefer 5–8 words.
+- One instruction only.
+- Start directly with the action.
+- Must be specific and repeatable.
+- No explanation.
+- No generic advice.
+- Do not repeat Value Additions or Examples/Data.
+
+EXAMPLE:
+
+- Substantiate every major claim with one concrete example.
+
+====================================================
+OUTPUT LENGTH
+====================================================
+
+Keep every field concise.
+
+The goal is a HIGH-QUALITY REVISION DATABASE.
+
+Do not produce essays.
+
+Do not repeat information across columns.
+
+====================================================
+PDF CONTENT
+====================================================
+
+${pdfText}
+
+`;
+
+
+}
+
+function formatRecallHighlights(sheet, row, column, value) {
+
+  if (!value || typeof value !== 'string') return;
+
+  // Support both correct and malformed closing markers
+  const regex = /\[MUST\](.*?)(?:\[\/MUST\]|\[MUST\])/g;
+
+  let match;
+  let matches = [];
+
+  while ((match = regex.exec(value)) !== null) {
+    matches.push({
+      fullStart: match.index,
+      fullLength: match[0].length,
+      term: match[1]
+    });
+  }
+
+  if (matches.length === 0) return;
+
+  // Remove all MUST markers from displayed text
+  const cleanText = value
+    .replace(/\[MUST\](.*?)\[\/MUST\]/g, '$1')
+    .replace(/\[MUST\](.*?)\[MUST\]/g, '$1');
+
+  const builder = SpreadsheetApp
+    .newRichTextValue()
+    .setText(cleanText);
+
+  matches.forEach(function(match) {
+
+    // Determine where the term appears in the cleaned text
+    const beforeText = value.substring(
+      0,
+      match.fullStart
+    );
+
+    const cleanedBefore = beforeText
+      .replace(/\[MUST\](.*?)\[\/MUST\]/g, '$1')
+      .replace(/\[MUST\](.*?)\[MUST\]/g, '$1');
+
+    const start = cleanedBefore.length;
+    const end = start + match.term.length;
+
+    builder.setTextStyle(
+      start,
+      end,
+      SpreadsheetApp
+        .newTextStyle()
+        .setBold(true)
+        .build()
+    );
+  });
+
+  sheet
+    .getRange(row, column)
+    .setRichTextValue(builder.build());
+}
+
+/***********************
+ * 6. GEMINI API
+ ***********************/
+
+function callGemini(
+  apiKey,
+  pdfText,
+  filenameDate,
+  modelName
+) {
+
+  const model =
+    modelName ||
+    CONFIG.MODEL;
+
+
+  const url =
+    'https://generativelanguage.googleapis.com/v1beta/models/' +
+    model +
+    ':generateContent?key=' +
+    encodeURIComponent(apiKey);
+
+
+  const prompt =
+    buildPrompt(
+      pdfText,
+      filenameDate
+    );
+
+
+  const payload = {
+
+    contents: [
+
+      {
+
+        role: 'user',
+
+        parts: [
+
+          {
+            text: prompt
+          }
+
+        ]
+
+      }
+
+    ],
+
+    generationConfig: {
+
+      responseMimeType:
+        'application/json',
+
+      responseSchema: {
+
+        type: 'OBJECT',
+
+        properties: {
+
+          question_date: {
+            type: 'STRING'
+          },
+
+          paper: {
+            type: 'STRING'
+          },
+
+          subject: {
+            type: 'STRING'
+          },
+
+          subtopic: {
+            type: 'STRING'
+          },
+
+          question: {
+            type: 'STRING'
+          },
+
+          marks: {
+            type: 'STRING'
+          },
+
+          max_marks: {
+            type: 'STRING'
+          },
+
+          demand: {
+            type: 'STRING'
+          },
+
+          demand_percentage: {
+            type: 'STRING'
+          },
+
+          directive: {
+            type: 'STRING'
+          },
+
+          best_introduction: {
+            type: 'STRING'
+          },
+
+          ideal_subheadings: {
+            type: 'STRING'
+          },
+
+          must_have_points: {
+            type: 'STRING'
+          },
+
+          value_additions: {
+            type: 'STRING'
+          },
+
+          essential_keywords: {
+            type: 'STRING'
+          },
+
+          examples_data: {
+            type: 'STRING'
+          },
+
+          best_conclusion: {
+            type: 'STRING'
+          },
+
+          missing_extra_improvements: {
+            type: 'STRING'
+          },
+
+          topper_edge: {
+            type: 'STRING'
+          },
+
+          overall_feedback: {
+            type: 'STRING'
+          },
+
+          my_one_learning: {
+            type: 'STRING'
+          },
+
+          intro_feedback: {
+            type: 'STRING'
+          },
+
+          body_feedback: {
+            type: 'STRING'
+          },
+
+          conclusion_feedback: {
+            type: 'STRING'
+          }
+
+        },
+
+        required: [
+
+          'question_date',
+          'paper',
+          'subject',
+          'subtopic',
+          'question',
+          'marks',
+          'max_marks',
+          'demand',
+          'demand_percentage',
+          'directive',
+          'best_introduction',
+          'ideal_subheadings',
+          'must_have_points',
+          'value_additions',
+          'essential_keywords',
+          'examples_data',
+          'best_conclusion',
+          'missing_extra_improvements',
+          'topper_edge',
+          'overall_feedback',
+          'my_one_learning',
+          'intro_feedback',
+          'body_feedback',
+          'conclusion_feedback'
+
+        ]
+
+      }
+
+    }
+
+  };
+
+
+  const options = {
+
+    method:
+      'post',
+
+    contentType:
+      'application/json',
+
+    payload:
+      JSON.stringify(payload),
+
+    muteHttpExceptions:
+      true
+
+  };
+
+
+  console.log(
+    'Gemini model: ' +
+    model
+  );
+
+  console.log(
+    'Gemini attempt 1/1'
+  );
+
+
+  let response;
+
+  try {
+
+    response =
+      UrlFetchApp.fetch(
+        url,
+        options
+      );
+
+  } catch (fetchError) {
+
+    /*
+     * Network / fetch failures are treated as transient
+     * when using the primary model. The fallback will run
+     * after 15 minutes.
+     */
+
+    if (
+      model === CONFIG.MODEL
+    ) {
+
+      const retryError =
+        new Error(
+          'Gemini fetch error: ' +
+          fetchError.message
+        );
+
+      retryError.retryable =
+        true;
+
+      retryError.fallbackScheduled =
+        true;
+
+      scheduleGeminiFallbackRetry();
+
+      throw retryError;
+
+    }
+
+    throw fetchError;
+
+  }
+
+
+  const status =
+    response.getResponseCode();
+
+
+  const body =
+    response.getContentText();
+
+
+  console.log(
+    'Gemini HTTP STATUS: ' +
+    status
+  );
+
+
+  /*
+   * SUCCESS
+   */
+
+  if (
+    status >= 200 &&
+    status < 300
+  ) {
+
+    let parsed;
+
+    try {
+
+      parsed =
+        JSON.parse(
+          body
+        );
+
+    } catch (error) {
+
+      throw new Error(
+        'Gemini returned invalid JSON: ' +
+        error.message
+      );
+
+    }
+
+
+    if (
+      !parsed.candidates ||
+      !parsed.candidates.length
+    ) {
+
+      throw new Error(
+        'Gemini returned no candidates.'
+      );
+
+    }
+
+
+    const parts =
+      parsed.candidates[0]
+        .content
+        .parts;
+
+
+    if (
+      !parts ||
+      !parts.length ||
+      !parts[0].text
+    ) {
+
+      throw new Error(
+        'Gemini returned no usable text.'
+      );
+
+    }
+
+
+    const output =
+      parts[0].text;
+
+
+    console.log(
+      'Gemini output received.'
+    );
+
+
+    let result;
+
+
+    try {
+
+      result =
+        JSON.parse(
+          output
+        );
+
+    } catch (error) {
+
+      /*
+       * Sometimes JSON may be wrapped in markdown.
+       */
+
+      const cleaned =
+        output
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .trim();
+
+
+      try {
+
+        result =
+          JSON.parse(
+            cleaned
+          );
+
+      } catch (secondError) {
+
+        throw new Error(
+          'Gemini output was not valid JSON: ' +
+          secondError.message +
+          '\nRaw output:\n' +
+          output
+        );
+
+      }
+
+    }
+
+
+    return result;
+
+  }
+
+
+  /*
+   * Only transient service/capacity errors trigger
+   * the 15-minute fallback.
+   */
+
+  const retryableStatuses = [
+    429,
+    500,
+    502,
+    503,
+    504
+  ];
+
+
+  if (
+    retryableStatuses.includes(
+      status
+    )
+  ) {
+
+    /*
+     * Primary model failed:
+     * schedule one-time fallback run.
+     */
+
+    if (
+      model === CONFIG.MODEL
+    ) {
+
+      const retryError =
+        new Error(
+          'Gemini API error ' +
+          status +
+          '. Fallback to ' +
+          CONFIG.FALLBACK_MODEL +
+          ' scheduled in approximately 1 minutes.'
+        );
+
+      retryError.retryable =
+        true;
+
+      retryError.fallbackScheduled =
+        true;
+
+      retryError.httpStatus =
+        status;
+
+
+      scheduleGeminiFallbackRetry();
+
+
+      throw retryError;
+
+    }
+
+
+    /*
+     * Fallback model also failed.
+     * Do not create an infinite retry loop.
+     */
+
+    throw new Error(
+      'Gemini fallback model ' +
+      model +
+      ' also failed with ' +
+      status +
+      ': ' +
+      body
+    );
+
+  }
+
+
+  /*
+   * Non-retryable errors:
+   * 400, 401, 403, 404, etc.
+   */
+
+  throw new Error(
+    'Gemini API error ' +
+    status +
+    ': ' +
+    body
+  );
+
+}
+
+
+/***********************
+ * 6A. SCHEDULE GEMINI FALLBACK
+ ***********************/
+
+function scheduleGeminiFallbackRetry() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+
+  const alreadyScheduled =
+    triggers.some(
+      function(trigger) {
+
+        return trigger.getHandlerFunction() ===
+          'processGeminiFallbackRetry';
+
+      }
+    );
+
+
+  if (
+    alreadyScheduled
+  ) {
+
+    console.log(
+      'Gemini fallback trigger already exists.'
+    );
+
+    return;
+
+  }
+
+
+  ScriptApp
+    .newTrigger(
+      'processGeminiFallbackRetry'
+    )
+    .timeBased()
+    .after(
+      0.1 * 60 * 1000
+    )
+    .create();
+
+
+  console.log(
+    'Gemini fallback scheduled for approximately 15 minutes later.'
+  );
+
+}
+
+
+/***********************
+ * 6B. GEMINI FALLBACK RUN
+ ***********************/
+
+function processGeminiFallbackRetry() {
+
+  /*
+   * Delete the one-time fallback trigger first.
+   */
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+
+  triggers.forEach(
+    function(trigger) {
+
+      if (
+        trigger.getHandlerFunction() ===
+        'processGeminiFallbackRetry'
+      ) {
+
+        ScriptApp.deleteTrigger(
+          trigger
+        );
+
+      }
+
+    }
+  );
+
+
+  const lock =
+    LockService.getScriptLock();
+
+
+  try {
+
+    lock.waitLock(30000);
+
+
+    console.log(
+      '=========================================='
+    );
+
+    console.log(
+      '15-MINUTE GEMINI FALLBACK RETRY STARTED'
+    );
+
+    console.log(
+      '=========================================='
+    );
+
+
+    const apiKey =
+      getGeminiApiKey();
+
+
+    if (!apiKey) {
+
+      throw new Error(
+        'Gemini API key not found. Add GEMINI_API_KEY to Script Properties.'
+      );
+
+    }
+
+
+    const sheet =
+      getSheet();
+
+
+    ensureHeaders(
+      sheet
+    );
+
+
+    const retryPendingIds =
+      getRetryPendingPdfIds(
+        sheet
+      );
+
+
+    if (
+      retryPendingIds.size === 0
+    ) {
+
+      console.log(
+        'No PDFs are waiting for fallback.'
+      );
+
+      return;
+
+    }
+
+
+    const processedIds =
+      getProcessedPdfIds(
+        sheet
+      );
+
+
+    const folder =
+      DriveApp.getFolderById(
+        CONFIG.PDF_FOLDER_ID
+      );
+
+
+    const files =
+      folder.getFilesByType(
+        MimeType.PDF
+      );
+
+
+    let attempted =
+      0;
+
+
+    while (
+      files.hasNext() &&
+      attempted < CONFIG.MAX_FILES_PER_RUN
+    ) {
+
+      const file =
+        files.next();
+
+
+      const fileId =
+        file.getId();
+
+
+      if (
+        processedIds.has(
+          fileId
+        )
+      ) {
+
+        continue;
+
+      }
+
+
+      if (
+        !retryPendingIds.has(
+          fileId
+        )
+      ) {
+
+        continue;
+
+      }
+
+
+      attempted++;
+
+
+      console.log(
+        'FALLBACK PDF: ' +
+        file.getName()
+      );
+
+
+      try {
+
+        processSinglePdf(
+          file,
+          sheet,
+          apiKey,
+          CONFIG.FALLBACK_MODEL
+        );
+
+
+        console.log(
+          'FALLBACK PROCESSING SUCCESSFUL: ' +
+          file.getName()
+        );
+
+
+        /*
+         * Remove the old RETRY_PENDING row so the
+         * successful result is the only record for
+         * this PDF.
+         */
+
+        removeRetryPendingRows(
+          sheet,
+          fileId
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          'FALLBACK PROCESSING FAILED: ' +
+          file.getName() +
+          ' | ' +
+          error.message
+        );
+
+
+        writeFailureRow(
+          sheet,
+          file,
+          error
+        );
+
+      }
+
+    }
+
+
+    console.log(
+      '=========================================='
+    );
+
+    console.log(
+      'FALLBACK RETRY FINISHED'
+    );
+
+    console.log(
+      'Attempted: ' +
+      attempted
+    );
+
+    console.log(
+      '=========================================='
+    );
+
+
+  } finally {
+
+    try {
+
+      lock.releaseLock();
+
+    } catch (e) {}
+
+  }
+
+}
+
+
+/***********************
+ * 6C. RETRY-PENDING IDS
+ ***********************/
+
+function getRetryPendingPdfIds(
+  sheet
+) {
+
+  const ids =
+    new Set();
+
+
+  if (
+    sheet.getLastRow() < 2
+  ) {
+
+    return ids;
+
+  }
+
+
+  const headers =
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        sheet.getLastColumn()
+      )
+      .getValues()[0];
+
+
+  const pdfIdColumn =
+    headers.indexOf(
+      'PDF ID'
+    ) + 1;
+
+
+  const statusColumn =
+    headers.indexOf(
+      'Status'
+    ) + 1;
+
+
+  if (
+    pdfIdColumn === 0 ||
+    statusColumn === 0
+  ) {
+
+    return ids;
+
+  }
+
+
+  const values =
+    sheet
+      .getRange(
+        2,
+        1,
+        sheet.getLastRow() - 1,
+        sheet.getLastColumn()
+      )
+      .getValues();
+
+
+  values.forEach(
+    function(row) {
+
+      const pdfId =
+        row[pdfIdColumn - 1];
+
+      const status =
+        String(
+          row[statusColumn - 1] ||
+          ''
+        );
+
+
+      if (
+        pdfId &&
+        status.indexOf(
+          'RETRY_PENDING'
+        ) === 0
+      ) {
+
+        ids.add(
+          String(
+            pdfId
+          )
+        );
+
+      }
+
+    }
+  );
+
+
+  return ids;
+
+}
+
+
+/***********************
+ * 6D. REMOVE OLD RETRY ROWS
+ ***********************/
+
+function removeRetryPendingRows(
+  sheet,
+  pdfId
+) {
+
+  const headers =
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        sheet.getLastColumn()
+      )
+      .getValues()[0];
+
+
+  const pdfIdColumn =
+    headers.indexOf(
+      'PDF ID'
+    ) + 1;
+
+
+  const statusColumn =
+    headers.indexOf(
+      'Status'
+    ) + 1;
+
+
+  if (
+    pdfIdColumn === 0 ||
+    statusColumn === 0 ||
+    sheet.getLastRow() < 2
+  ) {
+
+    return;
+
+  }
+
+
+  const values =
+    sheet
+      .getRange(
+        2,
+        1,
+        sheet.getLastRow() - 1,
+        sheet.getLastColumn()
+      )
+      .getValues();
+
+
+  for (
+    let i = values.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    const row =
+      values[i];
+
+
+    const rowPdfId =
+      String(
+        row[pdfIdColumn - 1] ||
+        ''
+      );
+
+
+    const status =
+      String(
+        row[statusColumn - 1] ||
+        ''
+      );
+
+
+    if (
+      rowPdfId === String(pdfId) &&
+      status.indexOf(
+        'RETRY_PENDING'
+      ) === 0
+    ) {
+
+      sheet.deleteRow(
+        i + 2
+      );
+
+    }
+
+  }
+
+}
+
+
+/***********************
+ * 7. WORD COUNT + MARKS
+ * CROSS-CHECK (regex only)
+ ***********************/
+
+function extractWordCountFromText(
+  pdfText
+) {
+
+  const match =
+    pdfText.match(
+      /Your Word Count:\s*(\d+)/i
+    );
+
+
+  return match ?
+    Number(match[1]) :
+    '';
+
+}
+
+
+function extractMarksFromText(
+  pdfText
+) {
+
+  const match =
+    pdfText.match(
+      /Marks scored:\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/i
+    );
+
+
+  if (!match) {
+
+    return {
+      marks: '',
+      max: ''
+    };
+
+  }
+
+
+  return {
+    marks: Number(match[1]),
+    max: Number(match[2])
+  };
+
+}
+
+
+/***********************
+ * 8. BUILD SHEET ROW
+ *
+ * MUST follow the exact HEADERS order.
+ ***********************/
+
+function buildSheetRow(
+  result,
+  pdfLink,
+  fileId,
+  wordCount,
+  marksVerified
+) {
+
+  return [
+
+    safeValue(result.question_date),
+    safeValue(result.paper),
+    safeValue(result.subject),
+    safeValue(result.subtopic),
+    safeValue(result.directive),
+
+    safeValue(result.marks),
+    safeValue(result.max_marks),
+    normalisePercentage(result.demand_percentage),
+    safeValue(wordCount),
+
+    safeValue(result.question),
+    safeValue(result.demand),
+
+    safeValue(result.intro_feedback),
+    safeValue(result.body_feedback),
+    safeValue(result.conclusion_feedback),
+    safeValue(result.overall_feedback),
+    safeValue(result.missing_extra_improvements),
+    safeValue(result.topper_edge),
+
+    safeValue(result.best_introduction),
+    safeValue(result.ideal_subheadings),
+    safeValue(result.must_have_points),
+    safeValue(result.best_conclusion),
+    safeValue(result.value_additions),
+    safeValue(result.essential_keywords),
+    safeValue(result.examples_data),
+    safeValue(result.my_one_learning),
+
+    pdfLink,
+    fileId,
+    'PROCESSED',
+
+    safeValue(marksVerified)
+
+  ];
+
+}
+
+
+/***********************
+ * 9. SAFE VALUE
+ ***********************/
+
+function safeValue(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+
+    return '';
+
+  }
+
+
+  return String(
+    value
+  ).trim();
+
+}
+
+
+/***********************
+ * 10. GEMINI API KEY
+ ***********************/
+
+function getGeminiApiKey() {
+
+  const properties =
+    PropertiesService
+      .getScriptProperties();
+
+
+  return properties.getProperty(
+    'GEMINI_API_KEY'
+  );
+
+}
+
+
+/***********************
+ * 11. GET SHEET
+ ***********************/
+
+function getSheet() {
+
+  const ss =
+    SpreadsheetApp.getActiveSpreadsheet();
+
+
+  if (!ss) {
+
+    throw new Error(
+      'This script is not bound to a Google Spreadsheet.'
+    );
+
+  }
+
+
+  let sheet =
+    ss.getSheetByName(
+      CONFIG.SHEET_NAME
+    );
+
+
+  if (!sheet) {
+
+    sheet =
+      ss.insertSheet(
+        CONFIG.SHEET_NAME
+      );
+
+  }
+
+
+  return sheet;
+
+}
+
+
+/***********************
+ * 12. ENSURE HEADERS
+ ***********************/
+
+function ensureHeaders(
+  sheet
+) {
+
+  /*
+   * If completely empty,
+   * write final headers.
+   */
+
+  if (
+    sheet.getLastColumn() === 0
+  ) {
+
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        HEADERS.length
+      )
+      .setValues([
+        HEADERS
+      ]);
+
+
+    formatHeaders(
+      sheet
+    );
+
+
+    return;
+
+  }
+
+
+  /*
+   * If existing sheet has old headers,
+   * do NOT silently mix old and new schemas.
+   *
+   * setupFinalSystem() should be used
+   * to create the clean final sheet.
+   */
+
+  const currentHeaders =
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        sheet.getLastColumn()
+      )
+      .getValues()[0];
+
+
+  const matches =
+    HEADERS.every(
+      function(header, index) {
+
+        return (
+          currentHeaders[index] ===
+          header
+        );
+
+      }
+    );
+
+
+  if (!matches) {
+
+    throw new Error(
+      'Sheet headers do not match the current ' +
+      HEADERS.length +
+      '-column system. ' +
+      'Run setupFinalSystem() once to create the correct sheet.'
+    );
+
+  }
+
+
+  formatHeaders(
+    sheet
+  );
+
+}
+
+
+/***********************
+ * 13. FORMAT HEADERS
+ ***********************/
+
+function formatHeaders(
+  sheet
+) {
+
+  const lastColumn =
+    sheet.getLastColumn();
+
+
+  sheet
+    .getRange(
+      1,
+      1,
+      1,
+      lastColumn
+    )
+    .setFontWeight(
+      'bold'
+    );
+
+
+  sheet.setFrozenRows(
+    1
+  );
+
+
+  sheet
+    .getRange(
+      1,
+      1,
+      sheet.getMaxRows(),
+      lastColumn
+    )
+    .setWrapStrategy(
+      SpreadsheetApp.WrapStrategy.WRAP
+    );
+
+
+  /*
+   * Reasonable widths, mapped to the new column order.
+   * Value Additions and Examples/Data given real room (500px).
+   */
+
+  const widths = {
+
+    1: 110,   // Question Date
+    2: 70,    // Paper
+    3: 130,   // Subject
+    4: 200,   // Subtopic
+    5: 110,   // Directive
+
+    6: 70,    // Marks
+    7: 90,    // Max Marks
+    8: 110,   // % of Demand Addressed
+    9: 90,    // Word Count
+
+    10: 380,  // Question
+    11: 320,  // Demand of the Question
+
+    12: 260,  // Intro Feedback
+    13: 260,  // Body Feedback
+    14: 260,  // Conclusion Feedback
+    15: 280,  // Overall Feedback
+    16: 300,  // Missing / Extra Improvements
+    17: 280,  // Topper Edge
+
+    18: 300,  // Best Introduction
+    19: 280,  // Ideal Subheadings
+    20: 340,  // Must-Have Points
+    21: 300,  // Best Conclusion
+    22: 500,  // Value Additions — given real room
+    23: 220,  // Essential Keywords
+    24: 500,  // Examples/Data — given real room
+    25: 260,  // My One Learning
+
+    26: 220,  // PDF Link
+    27: 250,  // PDF ID
+    28: 100,  // Status
+
+    29: 100   // Marks Verified — now last
+
+  };
+
+
+  Object.keys(
+    widths
+  ).forEach(
+    function(column) {
+
+      sheet.setColumnWidth(
+        Number(column),
+        widths[column]
+      );
+
+    }
+  );
+
+}
+
+
+/***********************
+ * 14. DUPLICATE PROTECTION
+ ***********************/
+
+function getProcessedPdfIds(
+  sheet
+) {
+
+  const ids =
+    new Set();
+
+
+  if (
+    sheet.getLastRow() < 2
+  ) {
+
+    return ids;
+
+  }
+
+
+  const headerRow =
+    sheet
+      .getRange(
+        1,
+        1,
+        1,
+        sheet.getLastColumn()
+      )
+      .getValues()[0];
+
+
+  const pdfIdColumn =
+    headerRow.indexOf(
+      'PDF ID'
+    ) + 1;
+
+
+  const statusColumn =
+    headerRow.indexOf(
+      'Status'
+    ) + 1;
+
+
+  if (
+    pdfIdColumn === 0 ||
+    statusColumn === 0
+  ) {
+
+    return ids;
+
+  }
+
+
+  const values =
+    sheet
+      .getRange(
+        2,
+        1,
+        sheet.getLastRow() - 1,
+        sheet.getLastColumn()
+      )
+      .getValues();
+
+
+  values.forEach(
+    function(row) {
+
+      const pdfId =
+        row[pdfIdColumn - 1];
+
+      const status =
+        String(
+          row[statusColumn - 1] ||
+          ''
+        );
+
+
+      /*
+       * Only a successful PROCESSED row counts
+       * as processed.
+       *
+       * FAILED / RETRY_PENDING rows remain eligible
+       * for another attempt.
+       */
+
+      if (
+        pdfId &&
+        status === 'PROCESSED'
+      ) {
+
+        ids.add(
+          String(
+            pdfId
+          )
+        );
+
+      }
+
+    }
+  );
+
+
+  return ids;
+
+}
+
+
+/***********************
+ * 14A. RETRYABLE FAILURE STATUS
+ ***********************/
+
+function writeRetryPendingRow(
+  sheet,
+  file,
+  error
+) {
+
+  const filenameDate =
+    extractDateFromFilename(
+      file.getName()
+    );
+
+
+  const row =
+    new Array(
+      HEADERS.length
+    ).fill('');
+
+
+  const dateCol =
+    HEADERS.indexOf(
+      'Question Date'
+    );
+
+  const linkCol =
+    HEADERS.indexOf(
+      'PDF Link'
+    );
+
+  const idCol =
+    HEADERS.indexOf(
+      'PDF ID'
+    );
+
+  const statusCol =
+    HEADERS.indexOf(
+      'Status'
+    );
+
+
+  row[dateCol] =
+    filenameDate;
+
+  row[linkCol] =
+    `=HYPERLINK("${file.getUrl()}","${file.getName()}")`;
+
+  row[idCol] =
+    file.getId();
+
+  row[statusCol] =
+    'RETRY_PENDING: ' +
+    error.message;
+
+
+  sheet.appendRow(
+    row
+  );
+
+
+  sortAnswersByDate(
+    sheet
+  );
+
+}
+
+
+/***********************
+ * 14B. WRITE FAILURE ROW
+ ***********************/
+
+function writeFailureRow(
+  sheet,
+  file,
+  error
+) {
+
+  /*
+   * If the error came from a transient primary-model
+   * failure, preserve it as RETRY_PENDING so the
+   * 15-minute fallback run knows exactly what to retry.
+   */
+
+  if (
+    error &&
+    error.fallbackScheduled
+  ) {
+
+    writeRetryPendingRow(
+      sheet,
+      file,
+      error
+    );
+
+    return;
+
+  }
+
+
+  const filenameDate =
+    extractDateFromFilename(
+      file.getName()
+    );
+
+
+  const row =
+    new Array(
+      HEADERS.length
+    ).fill('');
+
+
+  const dateCol =
+    HEADERS.indexOf(
+      'Question Date'
+    );
+
+  const linkCol =
+    HEADERS.indexOf(
+      'PDF Link'
+    );
+
+  const idCol =
+    HEADERS.indexOf(
+      'PDF ID'
+    );
+
+  const statusCol =
+    HEADERS.indexOf(
+      'Status'
+    );
+
+
+  row[dateCol] =
+    filenameDate;
+
+  row[linkCol] =
+    `=HYPERLINK("${file.getUrl()}","${file.getName()}")`;
+
+  row[idCol] =
+    file.getId();
+
+  row[statusCol] =
+    'FAILED: ' +
+    error.message;
+
+
+  sheet.appendRow(
+    row
+  );
+
+
+  sortAnswersByDate(
+    sheet
+  );
+
+}
+
+
+/***********************
+ * 15. WRITE FAILURE ROW
+ *
+ * Looks up column positions by header NAME rather than
+ * hardcoded index, so future reorders can't silently
+ * misplace PDF Link / PDF ID / Status again.
+ ***********************/
+
+function writeFailureRow(
+  sheet,
+  file,
+  error
+) {
+
+  const filenameDate =
+    extractDateFromFilename(
+      file.getName()
+    );
+
+
+  const row =
+    new Array(
+      HEADERS.length
+    ).fill('');
+
+
+  const dateCol =
+    HEADERS.indexOf('Question Date');
+
+  const linkCol =
+    HEADERS.indexOf('PDF Link');
+
+  const idCol =
+    HEADERS.indexOf('PDF ID');
+
+  const statusCol =
+    HEADERS.indexOf('Status');
+
+
+  row[dateCol] =
+    filenameDate;
+
+  row[linkCol] =
+    `=HYPERLINK("${file.getUrl()}","${file.getName()}")`;
+
+  row[idCol] =
+    file.getId();
+
+  row[statusCol] =
+    'FAILED: ' +
+    error.message;
+
+
+  sheet.appendRow(
+    row
+  );
+
+
+  sortAnswersByDate(
+    sheet
+  );
+
+}
+
+
+/***********************
+ * 16. SORT SHEET BY DATE
+ *
+ * Newest first. Called after EVERY write —
+ * success (in processSinglePdf) and failure
+ * (in writeFailureRow) — so the sheet is
+ * always current, not just after failures.
+ ***********************/
+
+function sortAnswersByDate(
+  sheet
+) {
+
+  const lastRow =
+    sheet.getLastRow();
+
+  const lastColumn =
+    sheet.getLastColumn();
+
+
+  if (lastRow > 1) {
+
+    sheet
+      .getRange(
+        2,
+        1,
+        lastRow - 1,
+        lastColumn
+      )
+      .sort({
+        column: 1,
+        ascending: false
+      });
+
+  }
+
+}
+
+
+/***********************
+ * 17. EXTRACT PDF TEXT
+ ***********************/
+
+function extractPdfText(
+  file
+) {
+
+  /*
+   * Convert PDF to temporary Google Doc.
+   *
+   * Requires Advanced Drive Service.
+   *
+   * In Apps Script:
+   * Services → + → Drive API
+   */
+
+  const blob =
+    file.getBlob();
+
+
+  const resource = {
+
+    name:
+      CONFIG.TEMP_DOC_PREFIX +
+      file.getName(),
+
+    mimeType:
+      MimeType.GOOGLE_DOCS
+
+  };
+
+
+  let tempFile;
+
+
+  try {
+
+    tempFile =
+      Drive.Files.create(
+        resource,
+        blob,
+        {
+          fields:
+            'id,name'
+        }
+      );
+
+
+  } catch (error) {
+
+    throw new Error(
+      'PDF → Google Doc conversion failed. ' +
+      'Make sure the Advanced Drive Service is enabled. ' +
+      error.message
+    );
+
+  }
+
+
+  const tempDocId =
+    tempFile.id;
+
+
+  try {
+
+    const doc =
+      DocumentApp.openById(
+        tempDocId
+      );
+
+
+    const text =
+      doc
+        .getBody()
+        .getText();
+
+
+    return text;
+
+  } finally {
+
+    try {
+
+      DriveApp
+        .getFileById(
+          tempDocId
+        )
+        .setTrashed(
+          true
+        );
+
+    } catch (cleanupError) {
+
+      console.warn(
+        'Could not delete temporary OCR document: ' +
+        cleanupError.message
+      );
+
+    }
+
+  }
+
+}
+
+
+/***********************
+ * 18. CLEANUP TEMP DOCS
+ ***********************/
+
+function cleanupTemporaryDocuments() {
+
+  /*
+   * Temporary documents are deleted
+   * immediately after extraction.
+   *
+   * This function is retained as a
+   * safety cleanup.
+   */
+
+  const files =
+    DriveApp
+      .searchFiles(
+        "title contains '" +
+        CONFIG.TEMP_DOC_PREFIX +
+        "' and trashed = false"
+      );
+
+
+  while (
+    files.hasNext()
+  ) {
+
+    try {
+
+      files
+        .next()
+        .setTrashed(
+          true
+        );
+
+    } catch (error) {
+
+      console.warn(
+        'Temporary cleanup failed: ' +
+        error.message
+      );
+
+    }
+
+  }
+
+}
+
+
+/***********************
+ * 19. EXTRACT DATE
+ * FROM PDF FILENAME
+ ***********************/
+
+function extractDateFromFilename(
+  fileName
+) {
+
+  const name =
+    String(
+      fileName || ''
+    )
+      .replace(
+        /\.pdf$/i,
+        ''
+      )
+      .trim();
+
+
+  let match;
+
+
+  /*
+   * YYYY-MM-DD
+   * YYYY_MM_DD
+   * YYYY.MM.DD
+   */
+
+  match =
+    name.match(
+      /\b(20\d{2})[-_.](\d{1,2})[-_.](\d{1,2})\b/
+    );
+
+
+  if (match) {
+
+    return formatDateParts(
+      match[1],
+      match[2],
+      match[3]
+    );
+
+  }
+
+
+  /*
+   * DD-MM-YYYY
+   * DD_MM_YYYY
+   * DD.MM.YYYY
+   */
+
+  match =
+    name.match(
+      /\b(\d{1,2})[-_.](\d{1,2})[-_.](20\d{2})\b/
+    );
+
+
+  if (match) {
+
+    return formatDateParts(
+      match[3],
+      match[2],
+      match[1]
+    );
+
+  }
+
+
+  const months = {
+
+    january: 1,
+    jan: 1,
+
+    february: 2,
+    feb: 2,
+
+    march: 3,
+    mar: 3,
+
+    april: 4,
+    apr: 4,
+
+    may: 5,
+
+    june: 6,
+    jun: 6,
+
+    july: 7,
+    jul: 7,
+
+    august: 8,
+    aug: 8,
+
+    september: 9,
+    sep: 9,
+    sept: 9,
+
+    october: 10,
+    oct: 10,
+
+    november: 11,
+    nov: 11,
+
+    december: 12,
+    dec: 12
+
+  };
+
+
+  /*
+   * DD Month YYYY
+   */
+
+  match =
+    name.match(
+      /\b(\d{1,2})[\s_-]+([A-Za-z]+)[\s_-]+(20\d{2})\b/i
+    );
+
+
+  if (
+    match &&
+    months[
+      match[2].toLowerCase()
+    ]
+  ) {
+
+    return formatDateParts(
+      match[3],
+      months[
+        match[2].toLowerCase()
+      ],
+      match[1]
+    );
+
+  }
+
+
+  /*
+   * Month DD YYYY
+   */
+
+  match =
+    name.match(
+      /\b([A-Za-z]+)[\s_-]+(\d{1,2})[\s_-]+(20\d{2})\b/i
+    );
+
+
+  if (
+    match &&
+    months[
+      match[1].toLowerCase()
+    ]
+  ) {
+
+    return formatDateParts(
+      match[3],
+      months[
+        match[1].toLowerCase()
+      ],
+      match[2]
+    );
+
+  }
+
+
+  /*
+   * DDMonYYYY
+   *
+   * Example:
+   * 12Aug2026
+   */
+
+  match =
+    name.match(
+      /\b(\d{1,2})[\s_-]*([A-Za-z]{3,9})[\s_-]*(20\d{2})\b/i
+    );
+
+
+  if (
+    match &&
+    months[
+      match[2].toLowerCase()
+    ]
+  ) {
+
+    return formatDateParts(
+      match[3],
+      months[
+        match[2].toLowerCase()
+      ],
+      match[1]
+    );
+
+  }
+
+
+  return 'Not verified';
+
+}
+
+
+/***********************
+ * 20. FORMAT DATE
+ ***********************/
+
+function formatDateParts(
+  year,
+  month,
+  day
+) {
+
+  year =
+    Number(year);
+
+  month =
+    Number(month);
+
+  day =
+    Number(day);
+
+
+  const date =
+    new Date(
+      year,
+      month - 1,
+      day
+    );
+
+
+  /*
+   * Validate date.
+   */
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+
+    return 'Not verified';
+
+  }
+
+
+  return Utilities.formatDate(
+    date,
+    Session.getScriptTimeZone() ||
+      'Asia/Kolkata',
+    'yyyy-MM-dd'
+  );
+
+}
+
+
+/***********************
+ * 21. NORMALISE %
+ ***********************/
+
+function normalisePercentage(
+  value
+) {
+
+  const number =
+    parseFloat(
+      String(
+        value
+      )
+        .replace(
+          '%',
+          ''
+        )
+        .trim()
+    );
+
+
+  if (
+    isNaN(number)
+  ) {
+
+    return safeValue(
+      value
+    );
+
+  }
+
+
+  return (
+    Math.round(
+      number * 10
+    ) / 10
+  ) + '%';
+
+}
+
+
+/***********************
+ * 22. FINAL SYSTEM SETUP
+ ***********************/
+
+/*
+ * RUN THIS ONCE.
+ *
+ * It creates a NEW Answers sheet
+ * with the final column structure.
+ *
+ * Your old Answers sheet is renamed
+ * to Answers_Archive_DATE_TIME.
+ *
+ * Your old data is NOT deleted.
+ */
+
+function setupFinalSystem() {
+
+  const ss =
+    SpreadsheetApp
+      .getActiveSpreadsheet();
+
+
+  if (!ss) {
+
+    throw new Error(
+      'This script is not bound to a Google Spreadsheet.'
+    );
+
+  }
+
+
+  const current =
+    ss.getSheetByName(
+      CONFIG.SHEET_NAME
+    );
+
+
+  const archiveName =
+    'Answers_Archive_' +
+    Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone() ||
+        'Asia/Kolkata',
+      'yyyyMMdd_HHmmss'
+    );
+
+
+  /*
+   * Archive old sheet.
+   */
+
+  if (
+    current &&
+    current.getLastRow() > 0
+  ) {
+
+    current.setName(
+      archiveName
+    );
+
+
+    console.log(
+      'Old Answers tab archived as: ' +
+      archiveName
+    );
+
+  } else if (
+    current
+  ) {
+
+    ss.deleteSheet(
+      current
+    );
+
+  }
+
+
+  /*
+   * Create clean final sheet.
+   */
+
+  const sheet =
+    ss.insertSheet(
+      CONFIG.SHEET_NAME
+    );
+
+
+  ensureHeaders(
+    sheet
+  );
+
+
+  console.log(
+    '=========================================='
+  );
+
+  console.log(
+    'FINAL SYSTEM SETUP COMPLETED'
+  );
+
+  console.log(
+    'Sheet: ' +
+    CONFIG.SHEET_NAME
+  );
+
+  console.log(
+    'Columns: ' +
+    HEADERS.length
+  );
+
+  console.log(
+    '=========================================='
+  );
+
+}
+
+
+/***********************
+ * 23. TEST GEMINI ONLY
+ ***********************/
+
+/*
+ * Run this ONLY if you want to
+ * verify Gemini connection.
+ *
+ * It makes exactly ONE request.
+ */
+
+function testGeminiConnection() {
+
+  const apiKey =
+    getGeminiApiKey();
+
+
+  if (!apiKey) {
+
+    throw new Error(
+      'GEMINI_API_KEY not found.'
+    );
+
+  }
+
+
+  const url =
+    'https://generativelanguage.googleapis.com/v1beta/models/' +
+    CONFIG.MODEL +
+    ':generateContent?key=' +
+    encodeURIComponent(
+      apiKey
+    );
+
+
+  const payload = {
+
+    contents: [
+
+      {
+
+        role: 'user',
+
+        parts: [
+
+          {
+
+            text:
+              'Reply with exactly: GEMINI TEST OK'
+
+          }
+
+        ]
+
+      }
+
+    ],
+
+    generationConfig: {
+
+      responseMimeType:
+        'text/plain'
+
+    }
+
+  };
+
+
+  const response =
+    UrlFetchApp.fetch(
+      url,
+      {
+
+        method:
+          'post',
+
+        contentType:
+          'application/json',
+
+        payload:
+          JSON.stringify(
+            payload
+          ),
+
+        muteHttpExceptions:
+          true
+
+      }
+    );
+
+
+  const statusCode =
+    response.getResponseCode();
+
+
+  const responseText =
+    response.getContentText();
+
+
+  Logger.log(
+    'GEMINI HTTP STATUS: ' +
+    statusCode
+  );
+
+
+  Logger.log(
+    'GEMINI RESPONSE: ' +
+    responseText
+  );
+
+
+  if (
+    statusCode !== 200
+  ) {
+
+    throw new Error(
+      'Gemini connection test failed. HTTP ' +
+      statusCode +
+      ': ' +
+      responseText
+    );
+
+  }
+
+
+  Logger.log(
+    'GEMINI CONNECTION TEST SUCCESSFUL.'
+  );
+
+}
+
+
+/***********************
+ * 24. WEB APP ENDPOINT
+ * (for AnswerOS live sync)
+ ***********************/
+
+/*
+ * DEPLOY AS WEB APP:
+ *   Deploy → New deployment → Web app
+ *   Execute as: Me
+ *   Who has access: Anyone with the link
+ *
+ * OPTIONAL SECURITY:
+ *   Script Properties → add SYNC_TOKEN = <any secret string>.
+ *   If set, requests must include ?token=<that same string>.
+ *   If not set, the endpoint is open to anyone with the URL —
+ *   fine for a personal tool, but set a token if you'd rather
+ *   not have it publicly readable.
+ *
+ * RESPONSE:
+ *   { "ok": true, "rows": [ {header: value, ...}, ... ] }
+ */
+
+function doGet(e) {
+
+  try {
+
+    const requiredToken =
+      PropertiesService
+        .getScriptProperties()
+        .getProperty('SYNC_TOKEN');
+
+
+    if (requiredToken) {
+
+      const providedToken =
+        e && e.parameter ?
+          e.parameter.token :
+          null;
+
+
+      if (providedToken !== requiredToken) {
+
+        return ContentService
+          .createTextOutput(
+            JSON.stringify({
+              ok: false,
+              error: 'Invalid or missing token.'
+            })
+          )
+          .setMimeType(
+            ContentService.MimeType.JSON
+          );
+
+      }
+
+    }
+
+
+    const sheet =
+      getSheet();
+
+
+    const lastRow =
+      sheet.getLastRow();
+
+
+    const lastColumn =
+      sheet.getLastColumn();
+
+
+    if (lastRow < 2) {
+
+      return ContentService
+        .createTextOutput(
+          JSON.stringify({
+            ok: true,
+            rows: []
+          })
+        )
+        .setMimeType(
+          ContentService.MimeType.JSON
+        );
+
+    }
+
+
+    const values =
+      sheet
+        .getRange(
+          1,
+          1,
+          lastRow,
+          lastColumn
+        )
+        .getValues();
+
+
+    const headerRow =
+      values[0];
+
+
+    const rows =
+      values
+        .slice(1)
+        .filter(function(row) {
+
+          // Skip fully blank trailing rows
+          return row.some(function(cell) {
+            return cell !== '' && cell !== null;
+          });
+
+        })
+        .map(function(row) {
+
+          const obj = {};
+
+          headerRow.forEach(
+            function(header, i) {
+
+              obj[header] = row[i];
+
+            }
+          );
+
+          return obj;
+
+        });
+
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: true,
+          rows: rows
+        })
+      )
+      .setMimeType(
+        ContentService.MimeType.JSON
+      );
+
+
+  } catch (error) {
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: false,
+          error: error.message
+        })
+      )
+      .setMimeType(
+        ContentService.MimeType.JSON
+      );
+
+  }
+
+}
