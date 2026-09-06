@@ -19,22 +19,13 @@
     if(!text)return {strength:'',gap:'',fix:''};
     const clean=s=>String(s||'').trim().replace(/^[-–—:\s]+/,'').trim();
     const normalize=s=>String(s||'').replace(/\s+/g,' ').trim();
-    const extract=(label,nextLabels)=>{
-      const next=nextLabels.join('|');
-      const re=new RegExp(`(?:^|[\\n•])\\s*[-–—]?\\s*${label}\\s*:\\s*(.*?)(?=\\s+[-–—]?\\s*(?:${next})\\s*:|$)`, 'is');
-      const m=text.match(re); return m?clean(normalize(m[1])):'';
-    };
-    return {
-      strength:extract('Strength(?:s)?',['Gap','Gaps','Fix','Improvements']),
-      gap:extract('Gap(?:s)?|Improvements?',['Strength','Strengths','Fix']),
-      fix:extract('Fix',['Strength','Strengths','Gap','Gaps','Improvements'])
-    };
+    const extract=(label,nextLabels)=>{const next=nextLabels.join('|');const re=new RegExp(`(?:^|[\\n•])\\s*[-–—]?\\s*${label}\\s*:\\s*(.*?)(?=\\s+[-–—]?\\s*(?:${next})\\s*:|$)`,'is');const m=text.match(re);return m?clean(normalize(m[1])):'';};
+    return {strength:extract('Strength(?:s)?',['Gap','Gaps','Fix','Improvements']),gap:extract('Gap(?:s)?|Improvements?',['Strength','Strengths','Fix']),fix:extract('Fix',['Strength','Strengths','Gap','Gaps','Improvements'])};
   }
   function deriveGapCategory(row){const text=[row['Missing / Extra Improvements'],row['Overall Feedback'],row['My One Learning']].filter(Boolean).join(' ').toLowerCase();if(/example|data|quantif|statistic/.test(text))return 'Examples & Data';if(/judgment|article|constitutional|legal|statut/.test(text))return 'Legal/Institutional Backing';if(/analysis|analytical|critical|depth|causal/.test(text))return 'Critical Analysis';if(/directive|demand/.test(text))return 'Demand/Directive';if(/intro/.test(text))return 'Introduction';if(/conclusion/.test(text))return 'Conclusion';if(/technical|scientific|mechanism/.test(text))return 'Technical Precision';return 'Content/Depth';}
 
-  // Accept a Drive URL, a HYPERLINK formula, or a raw Drive file ID.
-  // This lets the Sheet's "Checked Copy" column override the original PDF
-  // without changing the existing PDF Link / PDF ID fallback logic.
+  // Checked Copy is the highest-priority PDF source.
+  // Supports Drive file URLs, /open?id=, /uc?id=, HYPERLINK formulas, and raw file IDs.
   function extractDriveFileId(value){
     const text=String(value==null?'':value).trim();
     if(!text)return '';
@@ -43,6 +34,7 @@
     const patterns=[
       /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
       /drive\.google\.com\/open\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+      /drive\.google\.com\/uc\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
       /[?&]id=([a-zA-Z0-9_-]+)/i
     ];
     for(const pattern of patterns){const match=source.match(pattern);if(match)return match[1];}
@@ -51,14 +43,7 @@
   }
 
   function getCheckedCopyValue(row){
-    // Primary column requested by the user, with harmless aliases supported.
-    return String(
-      row['Checked Copy'] ||
-      row['Checked Copy Link'] ||
-      row['Checked Copy PDF'] ||
-      row['Checked Copy ID'] ||
-      ''
-    ).trim();
+    return String(row['Checked Copy']||row['Checked Copy Link']||row['Checked Copy PDF']||row['Checked Copy ID']||'').trim();
   }
 
   function normalizeRow(row,index){
@@ -72,60 +57,19 @@
     const demandItems=parseDemand(row['Demand of the Question']);
     const improvements=parseImprovements(row['Missing / Extra Improvements']);
     const parsedFeedback=parseOverallFeedback(row['Overall Feedback']);
-
     const originalPdfLink=String(row['PDF Link']||'').trim();
-    const originalPdfId=String(row['PDF ID']||'').trim();
+    const originalPdfId=extractDriveFileId(row['PDF ID'])||String(row['PDF ID']||'').trim();
 
-    // NEW PRIORITY:
-    // 1. If Checked Copy is populated, use it.
-    // 2. Otherwise use the existing PDF Link / PDF ID logic unchanged.
+    // Priority is deliberate: a valid Checked Copy always replaces the original PDF.
+    // If Checked Copy is blank or not a recognizable Drive file, the original remains the fallback.
     const checkedCopy=getCheckedCopyValue(row);
     const checkedCopyId=extractDriveFileId(checkedCopy);
-    const hasCheckedCopy=Boolean(checkedCopy && (checkedCopyId || /https?:\/\//i.test(checkedCopy)));
-
-    const pdfLink=hasCheckedCopy ? checkedCopy : originalPdfLink;
-    const pdfId=hasCheckedCopy ? (checkedCopyId || originalPdfId) : originalPdfId;
+    const hasCheckedCopy=Boolean(checkedCopyId);
+    const pdfLink=hasCheckedCopy?checkedCopy:originalPdfLink;
+    const pdfId=hasCheckedCopy?checkedCopyId:originalPdfId;
 
     return Object.assign({},row,{
-      id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
-      date,
-      paper:normalizePaper(row.Paper),
-      subject:String(row.Subject||'').trim(),
-      subtopic:String(row.Subtopic||'').trim(),
-      directive:String(row.Directive||'').trim(),
-      marks,
-      max,
-      score,
-      score10:score,
-      demandPct,
-      wordCount:toNumber(row['Word Count']),
-      question:String(row.Question||'').trim(),
-      status:String(row.Status||'').trim(),
-      gapCategory:deriveGapCategory(row),
-      demand:demandItems,
-      bestIntro:String(row['Best Introduction']||'').trim(),
-      idealSubheadings:parseList(row['Ideal Subheadings']),
-      mustHavePoints:parseList(row['Must-Have Points']),
-      valueAdditions:parseList(row['Value Additions']),
-      keywords:parseList(row['Essential Keywords']),
-      examples:parseList(row['Examples/Data']),
-      bestConclusion:String(row['Best Conclusion']||'').trim(),
-      improvements,
-      topperEdge:String(row['Topper Edge']||'').trim(),
-      learning:String(row['My One Learning']||'').trim(),
-      pdfLink,
-      pdfId,
-      pdf:pdfLink,
-      pdfUrl:pdfLink,
-      pdfDate:date,
-      checkedCopy,
-      checkedCopyId,
-      usingCheckedCopy:hasCheckedCopy,
-      feedback:{
-        strength:parsedFeedback.strength || '',
-        gap:parsedFeedback.gap || '',
-        fix:parsedFeedback.fix || ''
-      }
+      id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),date,paper:normalizePaper(row.Paper),subject:String(row.Subject||'').trim(),subtopic:String(row.Subtopic||'').trim(),directive:String(row.Directive||'').trim(),marks,max,score,score10:score,demandPct,wordCount:toNumber(row['Word Count']),question:String(row.Question||'').trim(),status:String(row.Status||'').trim(),gapCategory:deriveGapCategory(row),demand:demandItems,bestIntro:String(row['Best Introduction']||'').trim(),idealSubheadings:parseList(row['Ideal Subheadings']),mustHavePoints:parseList(row['Must-Have Points']),valueAdditions:parseList(row['Value Additions']),keywords:parseList(row['Essential Keywords']),examples:parseList(row['Examples/Data']),bestConclusion:String(row['Best Conclusion']||'').trim(),improvements,topperEdge:String(row['Topper Edge']||'').trim(),learning:String(row['My One Learning']||'').trim(),pdfLink,pdfId,pdf:pdfLink,pdfUrl:pdfLink,pdfDate:date,checkedCopy,checkedCopyId,usingCheckedCopy:hasCheckedCopy,feedback:{strength:parsedFeedback.strength||'',gap:parsedFeedback.gap||'',fix:parsedFeedback.fix||''}
     });
   }
   function normalizeRows(rows){return (Array.isArray(rows)?rows:[]).map(normalizeRow).filter(r=>r.date||r.question||r.subject).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
