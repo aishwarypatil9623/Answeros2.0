@@ -3,11 +3,38 @@
 */
 (function () {
   'use strict';
-  const STORAGE={config:'answeros_config_v1',answers:'answeros_answers_v1',hash:'answeros_answers_hash_v1',syncedAt:'answeros_last_sync_v1'};
-  const DEFAULTS={syncUrl:'https://script.google.com/macros/s/AKfycbyUFgUono_7Ce9XRuBND1sZXxcwfbiNw_yWn0GCHlsiAzmUiIpYb-_n6545Bv1PyUD3/exec',syncToken:'',autoSyncEnabled:false,syncIntervalMinutes:30};
+  const STORAGE={config:'answeros_config_v1',answers:'answeros_answers_v1',hash:'answeros_answers_hash_v1',syncedAt:'answeros_last_sync_v1',revision:'answeros_revision_state_v1',notes:'answeros_notes_v1'};
+  const DEFAULTS={syncUrl:'https://script.google.com/macros/s/AKfycbyUFgUono_7Ce9XRuBND1sZXxcwfbiNw_yWn0GCHlsiAzmUiIpYb-_n6545Bv1PyUD3/exec',syncToken:'',autoSyncEnabled:false,syncIntervalMinutes:30,dailyAnswerTarget:2,weeklyAnswerTarget:10,monthlyAnswerTarget:40,minScoreTarget:6,prelims:'2027-05-23',mains:'2027-08-20',sheetUrl:''};
   function readJSON(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback;}catch(_){return fallback;}}
   function getConfig(){return Object.assign({},DEFAULTS,readJSON(STORAGE.config,{}));}
   function saveConfig(patch){const next=Object.assign({},getConfig(),patch||{});localStorage.setItem(STORAGE.config,JSON.stringify(next));return next;}
+  // Revision-cycle state (reviewed/confidence/nextDue per answer) — kept in its OWN
+  // storage key, separate from the synced answers cache, so a Sheet re-sync (which
+  // overwrites STORAGE.answers wholesale) never wipes out a person's revision progress.
+  // Keyed by answer id (the Sheet's PDF ID), which stays stable across syncs.
+  function getRevisionState(){return readJSON(STORAGE.revision,{});}
+  function saveRevisionState(id,patch){
+    const all=getRevisionState();
+    all[id]=Object.assign({},all[id]||{},patch||{});
+    localStorage.setItem(STORAGE.revision,JSON.stringify(all));
+    return all[id];
+  }
+  // Personal notes (Phase 1: PDF text extracted client-side, tagged to a subtopic).
+  // Stored as an array, entirely separate from the synced answers cache — notes
+  // aren't part of the Google Sheet, so nothing here is touched by sync().
+  function getNotes(){return readJSON(STORAGE.notes,[]);}
+  function saveNote(note){
+    const all=getNotes();
+    const idx=all.findIndex(n=>n.id===note.id);
+    if(idx>=0) all[idx]=note; else all.push(note);
+    localStorage.setItem(STORAGE.notes,JSON.stringify(all));
+    return all;
+  }
+  function deleteNote(id){
+    const all=getNotes().filter(n=>n.id!==id);
+    localStorage.setItem(STORAGE.notes,JSON.stringify(all));
+    return all;
+  }
   function normalizePaper(value){return String(value==null?'':value).trim().replace(/\s+/g,'').toUpperCase();}
   function toNumber(value){if(value===''||value==null)return null;const n=Number(String(value).replace(/,/g,'').replace('%',''));return Number.isFinite(n)?n:null;}
   function toDateString(value){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -18,34 +45,20 @@
     const text=String(value||'').trim();
     if(!text)return {strength:'',gap:'',fix:''};
     const clean=s=>String(s||'').trim().replace(/^[-–—:\s]+/,'').trim();
+    // Handles both newline-separated and inline formats such as "- Strength: ... - Gap: ... - Fix: ...".
     const normalize=s=>String(s||'').replace(/\s+/g,' ').trim();
-    const extract=(label,nextLabels)=>{const next=nextLabels.join('|');const re=new RegExp(`(?:^|[\\n•])\\s*[-–—]?\\s*${label}\\s*:\\s*(.*?)(?=\\s+[-–—]?\\s*(?:${next})\\s*:|$)`,'is');const m=text.match(re);return m?clean(normalize(m[1])):'';};
-    return {strength:extract('Strength(?:s)?',['Gap','Gaps','Fix','Improvements']),gap:extract('Gap(?:s)?|Improvements?',['Strength','Strengths','Fix']),fix:extract('Fix',['Strength','Strengths','Gap','Gaps','Improvements'])};
+    const extract=(label,nextLabels)=>{
+      const next=nextLabels.join('|');
+      const re=new RegExp(`(?:^|[\\n•])\\s*[-–—]?\\s*${label}\\s*:\\s*(.*?)(?=\\s+[-–—]?\\s*(?:${next})\\s*:|$)`, 'is');
+      const m=text.match(re); return m?clean(normalize(m[1])):'';
+    };
+    return {
+      strength:extract('Strength(?:s)?',['Gap','Gaps','Fix','Improvements']),
+      gap:extract('Gap(?:s)?|Improvements?',['Strength','Strengths','Fix']),
+      fix:extract('Fix',['Strength','Strengths','Gap','Gaps','Improvements'])
+    };
   }
   function deriveGapCategory(row){const text=[row['Missing / Extra Improvements'],row['Overall Feedback'],row['My One Learning']].filter(Boolean).join(' ').toLowerCase();if(/example|data|quantif|statistic/.test(text))return 'Examples & Data';if(/judgment|article|constitutional|legal|statut/.test(text))return 'Legal/Institutional Backing';if(/analysis|analytical|critical|depth|causal/.test(text))return 'Critical Analysis';if(/directive|demand/.test(text))return 'Demand/Directive';if(/intro/.test(text))return 'Introduction';if(/conclusion/.test(text))return 'Conclusion';if(/technical|scientific|mechanism/.test(text))return 'Technical Precision';return 'Content/Depth';}
-
-  // Checked Copy is the highest-priority PDF source.
-  // Supports Drive file URLs, /open?id=, /uc?id=, HYPERLINK formulas, and raw file IDs.
-  function extractDriveFileId(value){
-    const text=String(value==null?'':value).trim();
-    if(!text)return '';
-    const hyperlink=text.match(/HYPERLINK\(\s*["']([^"']+)["']/i);
-    const source=hyperlink?hyperlink[1]:text;
-    const patterns=[
-      /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
-      /drive\.google\.com\/open\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
-      /drive\.google\.com\/uc\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
-      /[?&]id=([a-zA-Z0-9_-]+)/i
-    ];
-    for(const pattern of patterns){const match=source.match(pattern);if(match)return match[1];}
-    if(/^[a-zA-Z0-9_-]{20,}$/.test(source))return source;
-    return '';
-  }
-
-  function getCheckedCopyValue(row){
-    return String(row['Checked Copy']||row['Checked Copy Link']||row['Checked Copy PDF']||row['Checked Copy ID']||'').trim();
-  }
-
   function normalizeRow(row,index){
     row=row||{};
     const date=toDateString(row['Question Date']);
@@ -57,19 +70,45 @@
     const demandItems=parseDemand(row['Demand of the Question']);
     const improvements=parseImprovements(row['Missing / Extra Improvements']);
     const parsedFeedback=parseOverallFeedback(row['Overall Feedback']);
-    const originalPdfLink=String(row['PDF Link']||'').trim();
-    const originalPdfId=extractDriveFileId(row['PDF ID'])||String(row['PDF ID']||'').trim();
-
-    // Priority is deliberate: a valid Checked Copy always replaces the original PDF.
-    // If Checked Copy is blank or not a recognizable Drive file, the original remains the fallback.
-    const checkedCopy=getCheckedCopyValue(row);
-    const checkedCopyId=extractDriveFileId(checkedCopy);
-    const hasCheckedCopy=Boolean(checkedCopyId);
-    const pdfLink=hasCheckedCopy?checkedCopy:originalPdfLink;
-    const pdfId=hasCheckedCopy?checkedCopyId:originalPdfId;
-
+    const pdfLink=String(row['PDF Link']||'').trim();
+    const pdfId=String(row['PDF ID']||'').trim();
     return Object.assign({},row,{
-      id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),date,paper:normalizePaper(row.Paper),subject:String(row.Subject||'').trim(),subtopic:String(row.Subtopic||'').trim(),directive:String(row.Directive||'').trim(),marks,max,score,score10:score,demandPct,wordCount:toNumber(row['Word Count']),question:String(row.Question||'').trim(),status:String(row.Status||'').trim(),gapCategory:deriveGapCategory(row),demand:demandItems,bestIntro:String(row['Best Introduction']||'').trim(),idealSubheadings:parseList(row['Ideal Subheadings']),mustHavePoints:parseList(row['Must-Have Points']),valueAdditions:parseList(row['Value Additions']),keywords:parseList(row['Essential Keywords']),examples:parseList(row['Examples/Data']),bestConclusion:String(row['Best Conclusion']||'').trim(),improvements,topperEdge:String(row['Topper Edge']||'').trim(),learning:String(row['My One Learning']||'').trim(),pdfLink,pdfId,pdf:pdfLink,pdfUrl:pdfLink,pdfDate:date,checkedCopy,checkedCopyId,usingCheckedCopy:hasCheckedCopy,feedback:{strength:parsedFeedback.strength||'',gap:parsedFeedback.gap||'',fix:parsedFeedback.fix||''}
+      id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
+      date,
+      paper:normalizePaper(row.Paper),
+      subject:String(row.Subject||'').trim(),
+      subtopic:String(row.Subtopic||'').trim(),
+      directive:String(row.Directive||'').trim(),
+      marks,
+      max,
+      score,
+      score10:score,
+      demandPct,
+      wordCount:toNumber(row['Word Count']),
+      question:String(row.Question||'').trim(),
+      status:String(row.Status||'').trim(),
+      gapCategory:deriveGapCategory(row),
+      demand:demandItems,
+      bestIntro:String(row['Best Introduction']||'').trim(),
+      idealSubheadings:parseList(row['Ideal Subheadings']),
+      mustHavePoints:parseList(row['Must-Have Points']),
+      valueAdditions:parseList(row['Value Additions']),
+      keywords:parseList(row['Essential Keywords']),
+      examples:parseList(row['Examples/Data']),
+      bestConclusion:String(row['Best Conclusion']||'').trim(),
+      improvements,
+      topperEdge:String(row['Topper Edge']||'').trim(),
+      learning:String(row['My One Learning']||'').trim(),
+      pdfLink,
+      pdfId,
+      pdf:pdfLink,
+      pdfUrl:pdfLink,
+      pdfDate:date,
+      feedback:{
+        strength:parsedFeedback.strength || '',
+        gap:parsedFeedback.gap || '',
+        fix:parsedFeedback.fix || ''
+      }
     });
   }
   function normalizeRows(rows){return (Array.isArray(rows)?rows:[]).map(normalizeRow).filter(r=>r.date||r.question||r.subject).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
@@ -81,5 +120,5 @@
   function today(){return new Date();}
   function formatDate(value){const d=value instanceof Date?value:new Date(value);return toDateString(d);}
   function initPage(options){const opts=Object.assign({reloadOnChange:true},options||{});const config=getConfig();sync(opts).catch(error=>{console.warn('[AnswerOS] Sync failed; using cached data.',error);window.dispatchEvent(new CustomEvent('answeros:sync-error',{detail:{error}}));});if(config.autoSyncEnabled){const ms=Math.max(5,Number(config.syncIntervalMinutes)||30)*60*1000;window.setInterval(()=>{sync(opts).catch(error=>console.warn('[AnswerOS] Auto-sync failed.',error));},ms);}}
-  window.AnswerOSData={STORAGE,DEFAULTS,getConfig,saveConfig,getAnswers,getLastSync,normalizeRows,sync,initPage,today,formatDate};
+  window.AnswerOSData={STORAGE,DEFAULTS,getConfig,saveConfig,getAnswers,getLastSync,normalizeRows,sync,initPage,today,formatDate,getRevisionState,saveRevisionState,getNotes,saveNote,deleteNote};
 })();
