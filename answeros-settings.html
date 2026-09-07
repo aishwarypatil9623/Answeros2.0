@@ -199,19 +199,25 @@ let CONFIG = {
   fontSize: 'medium',
   sidebarQuote: true,
 
-  // Targets
-  dailyAnswerTarget: 2,
-  weeklyAnswerTarget: 10,
-  monthlyAnswerTarget: 40,
-  minScoreTarget: 6,
-  prelims: '2027-05-23',
-  mains: '2027-08-20',
-
-  // Sync
-  syncUrl: '',
-  syncToken: '',
-  autoSyncEnabled: false,
-  syncIntervalMinutes: 30,
+  // Targets, Exam Dates & Sync — these are shared across every AnswerOS
+  // page via AnswerOSData, so we seed them from the shared store instead
+  // of hardcoding fresh defaults here (which used to reset them on load).
+  ...(function(){
+    const shared = AnswerOSData.getConfig();
+    return {
+      dailyAnswerTarget: shared.dailyAnswerTarget,
+      weeklyAnswerTarget: shared.weeklyAnswerTarget,
+      monthlyAnswerTarget: shared.monthlyAnswerTarget,
+      minScoreTarget: shared.minScoreTarget,
+      prelims: shared.prelims,
+      mains: shared.mains,
+      syncUrl: shared.syncUrl,
+      syncToken: shared.syncToken,
+      sheetUrl: shared.sheetUrl,
+      autoSyncEnabled: shared.autoSyncEnabled,
+      syncIntervalMinutes: shared.syncIntervalMinutes
+    };
+  })(),
 
   // Pages visibility
   pagesVisible: {
@@ -251,13 +257,14 @@ function navIcon(name){
     layers:'<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
     cal2:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
     flag:'<path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5"/>',
-    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'
+    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',
+  notes:'<path d="M9 2h6l5 5v13a2 2 0 01-2 2H9a2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p[name]}</svg>`;
 }
 document.getElementById('nav').innerHTML = [
   ['Dashboard','grid','answeros-dashboard.html'],['All Answers','list','answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html'],
-  ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
+  ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Notes','notes','answeros-notes.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
   ['Calendar','cal2','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html',true]
 ].map(([label,ic,href,active])=> href
     ? `<a href="${href}" class="nav-item ${active?'active':''}" style="text-decoration:none;">${navIcon(ic)}<span>${label}</span></a>`
@@ -403,7 +410,7 @@ function renderPanel(){
   }
 
   else if(activeSection==='targets'){
-    function daysLeft(d){ return Math.round((new Date(d)-new Date('2026-08-16'))/86400000); }
+    function daysLeft(d){ return Math.round((new Date(d)-AnswerOSData.today())/86400000); }
     c.innerHTML = `<div class="settings-panel active">
       <div class="s-card">
         <div class="s-card-head"><h3>Writing Targets</h3><p>Used by the Dashboard "Today's Goal" pill, Goals page defaults, and Analytics thresholds.</p></div>
@@ -447,12 +454,19 @@ function renderPanel(){
       CONFIG.weeklyAnswerTarget = parseInt(document.getElementById('cfgWeekly').value)||10;
       CONFIG.monthlyAnswerTarget = parseInt(document.getElementById('cfgMonthly').value)||40;
       CONFIG.minScoreTarget = parseFloat(document.getElementById('cfgScore').value)||6;
-      showToast('Targets saved.');
+      AnswerOSData.saveConfig({
+        dailyAnswerTarget: CONFIG.dailyAnswerTarget,
+        weeklyAnswerTarget: CONFIG.weeklyAnswerTarget,
+        monthlyAnswerTarget: CONFIG.monthlyAnswerTarget,
+        minScoreTarget: CONFIG.minScoreTarget
+      });
+      showToast('Targets saved — now live on Dashboard & Analytics.');
     });
     document.getElementById('saveDates').addEventListener('click', ()=>{
       CONFIG.prelims = document.getElementById('cfgPrelims').value;
       CONFIG.mains = document.getElementById('cfgMains').value;
-      showToast('Exam dates saved.');
+      AnswerOSData.saveConfig({ prelims: CONFIG.prelims, mains: CONFIG.mains });
+      showToast('Exam dates saved — now live on Dashboard & Calendar.');
       renderPanel();
     });
   }
@@ -469,6 +483,10 @@ function renderPanel(){
           <div class="sync-status" id="syncStatus"></div>
         </div>
         <div class="s-field"><label>Sync Token (optional)</label><input type="text" id="cfgSyncToken" placeholder="The SYNC_TOKEN you set in Script Properties" value="${CONFIG.syncToken}" /></div>
+        <div class="s-divider"></div>
+        <div class="s-field"><label>Google Sheet Link (for the "Open Sheet" button on your Dashboard)</label>
+          <input type="text" id="cfgSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit" value="${CONFIG.sheetUrl||''}" />
+        </div>
         <div class="s-divider"></div>
         <div class="s-row">
           <div><div class="s-row-label">Auto-sync while page is open</div><div class="s-row-sub">Polls your sheet on a timer. Works only when hosted — not in Claude's preview.</div></div>
@@ -490,6 +508,8 @@ function renderPanel(){
     document.getElementById('saveSyncSettings').addEventListener('click', ()=>{
       CONFIG.syncUrl = document.getElementById('cfgSyncUrl').value.trim();
       CONFIG.syncToken = document.getElementById('cfgSyncToken').value.trim();
+      CONFIG.sheetUrl = document.getElementById('cfgSheetUrl').value.trim();
+      AnswerOSData.saveConfig({ sheetUrl: CONFIG.sheetUrl });
       showToast('Sync settings saved.');
     });
     document.getElementById('testSyncBtn').addEventListener('click', async ()=>{
@@ -678,7 +698,36 @@ document.getElementById('avatarWrap').addEventListener('click', ()=>{ activeSect
 </script>
 
 <script>
-(function(){\n  // Persist the sync controls in the same shared store used by every page.\n  function applySavedSync(){\n    const cfg = AnswerOSData.getConfig();\n    const url = document.getElementById('cfgSyncUrl');\n    const token = document.getElementById('cfgSyncToken');\n    if (url && cfg.syncUrl && !url.dataset.answerosLoaded) { url.value = cfg.syncUrl; url.dataset.answerosLoaded = '1'; }\n    if (token && cfg.syncToken && !token.dataset.answerosLoaded) { token.value = cfg.syncToken; token.dataset.answerosLoaded = '1'; }\n  }\n  function saveSyncFromUI(){\n    const url = document.getElementById('cfgSyncUrl');\n    const token = document.getElementById('cfgSyncToken');\n    const toggle = document.getElementById('togAutoSync');\n    if (!url) return;\n    AnswerOSData.saveConfig({\n      syncUrl: url.value.trim(),\n      syncToken: token ? token.value.trim() : '',\n      autoSyncEnabled: !!(toggle && toggle.classList.contains('on'))\n    });\n  }\n  const observer = new MutationObserver(applySavedSync);\n  observer.observe(document.body, {childList:true, subtree:true});\n  applySavedSync();\n  document.addEventListener('click', function(e){\n    const target = e.target.closest && e.target.closest('#saveSyncSettings, #togAutoSync');\n    if (target) setTimeout(function(){ saveSyncFromUI(); }, 0);\n  });\n})();
+(function(){
+  // Persist the sync controls in the same shared store used by every page.
+  function applySavedSync(){
+    const cfg = AnswerOSData.getConfig();
+    const url = document.getElementById('cfgSyncUrl');
+    const token = document.getElementById('cfgSyncToken');
+    const sheetUrl = document.getElementById('cfgSheetUrl');
+    if (url && cfg.syncUrl && !url.dataset.answerosLoaded) { url.value = cfg.syncUrl; url.dataset.answerosLoaded = '1'; }
+    if (token && cfg.syncToken && !token.dataset.answerosLoaded) { token.value = cfg.syncToken; token.dataset.answerosLoaded = '1'; }
+    if (sheetUrl && cfg.sheetUrl && !sheetUrl.dataset.answerosLoaded) { sheetUrl.value = cfg.sheetUrl; sheetUrl.dataset.answerosLoaded = '1'; }
+  }
+  function saveSyncFromUI(){
+    const url = document.getElementById('cfgSyncUrl');
+    const token = document.getElementById('cfgSyncToken');
+    const toggle = document.getElementById('togAutoSync');
+    if (!url) return;
+    AnswerOSData.saveConfig({
+      syncUrl: url.value.trim(),
+      syncToken: token ? token.value.trim() : '',
+      autoSyncEnabled: !!(toggle && toggle.classList.contains('on'))
+    });
+  }
+  const observer = new MutationObserver(applySavedSync);
+  observer.observe(document.body, {childList:true, subtree:true});
+  applySavedSync();
+  document.addEventListener('click', function(e){
+    const target = e.target.closest && e.target.closest('#saveSyncSettings, #togAutoSync');
+    if (target) setTimeout(function(){ saveSyncFromUI(); }, 0);
+  });
+})();
 </script>
 </body>
 </html>
