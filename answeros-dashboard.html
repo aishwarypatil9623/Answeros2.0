@@ -129,6 +129,12 @@
   .refresh-btn svg{width:13px;height:13px;}
   .refresh-btn.spinning svg{animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  .reset-layout-btn{display:flex;align-items:center;gap:7px;background:#fff;color:var(--ink-700);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:var(--shadow);transition:border-color .12s ease;margin-top:10px;margin-left:8px;}
+  .reset-layout-btn:hover{border-color:var(--green-600);color:var(--green-700);}
+  .reset-layout-btn svg{width:13px;height:13px;}
+  .open-sheet-btn{position:fixed;bottom:22px;right:22px;width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green-700);z-index:40;transition:transform .12s ease, box-shadow .12s ease;}
+  .open-sheet-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(20,23,26,.12);}
+  .open-sheet-btn svg{width:16px;height:16px;}
   .refresh-toast{position:fixed;top:20px;right:24px;background:var(--ink-900);color:#fff;font-size:12.5px;padding:11px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:0;transform:translateY(-8px);transition:all .2s ease;pointer-events:none;z-index:50;max-width:280px;line-height:1.5;}
   .refresh-toast.show{opacity:1;transform:translateY(0);}
   .top-stats{display:flex;gap:12px;flex-wrap:wrap;}
@@ -185,9 +191,20 @@
   .qs-val span{font-size:10px;font-weight:600;color:var(--ink-400,#9aa0a5);margin-left:1px;}
   .qs-label{font-size:9.5px;color:var(--ink-500);white-space:nowrap;margin-top:1px;}
 
-  .grid3{display:grid;grid-template-columns: 1.3fr 1.3fr 1.15fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .grid3{display:grid;grid-template-columns: var(--c1,1.3fr) 14px var(--c2,1.3fr) 14px var(--c3,1.15fr);gap:0 0;margin-bottom:16px;align-items:stretch;}
   .grid3b{display:grid;grid-template-columns: 1.3fr 1.3fr 1fr;gap:16px;margin-bottom:16px;}
-  .grid4{display:grid;grid-template-columns: 1fr 1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+  .grid4{display:grid;grid-template-columns: var(--c1,1fr) 14px var(--c2,1fr) 14px var(--c3,1fr) 14px var(--c4,1fr);gap:0 0;margin-bottom:16px;}
+  /* draggable handles between cards in a resizable row — width matches the row's
+     old 16px gap so removing the gap in favor of an explicit column doesn't shift
+     anything visually until the person actually drags it. */
+  .grid-resizer{cursor:col-resize;position:relative;align-self:stretch;border-radius:3px;}
+  .grid-resizer:hover::after, .grid-resizer.dragging::after{background:var(--green-600);}
+  .grid-resizer::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:36px;border-radius:3px;background:var(--line);transition:background .12s ease;}
+  /* Grid items default to min-width:auto (sized to their content's min-content),
+     which silently overrides fr-based track sizing — there's no free space left
+     for the fr ratio to actually redistribute once every card is already at its
+     content-driven minimum. This is what makes the resizer "not work" otherwise. */
+  .grid3 > section.card, .grid4 > section.card{min-width:0;overflow:hidden;}
 
   /* Legend list */
   .legend-list{display:flex;flex-direction:column;gap:9px;margin-top:2px;}
@@ -330,6 +347,9 @@
 </style>
 </head>
 <body>
+<button id="openSheetBtn" class="open-sheet-btn" title="Open your Google Sheet">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>
+</button>
 <div class="app">
 
   <!-- ================= SIDEBAR ================= -->
@@ -371,6 +391,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
           Refresh from Sheet
         </button>
+        <button id="resetLayoutBtn" class="reset-layout-btn" title="Undo any card resizing back to the normal layout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.3"/><path d="M3 4v5h5"/></svg>
+          Reset Layout
+        </button>
       </div>
       <div id="refreshToast" class="refresh-toast"></div>
       <div class="top-stats">
@@ -398,7 +422,7 @@
     <div class="quickstats" id="quickStats"></div>
 
     <!-- Row: Subject Distribution / Score Trend / Recent Answers -->
-    <div class="grid3">
+    <div class="grid3" id="dashRow1">
       <section class="card">
         <div class="card-head"><h3>Subject Performance</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;">volume + avg score</span></div>
         <div class="subj-pie-row">
@@ -409,6 +433,8 @@
         </div>
         <div class="insight-note" id="subjectInsight"></div>
       </section>
+
+      <div class="grid-resizer"></div>
 
       <section class="card">
         <div class="card-head">
@@ -434,6 +460,8 @@
         <div id="trendEmpty" style="display:none;text-align:center;color:var(--ink-500);font-size:12px;padding:30px 0;">No answers match this filter.</div>
         <div class="insight-note" id="trendInsight"></div>
       </section>
+
+      <div class="grid-resizer"></div>
 
       <section class="card">
         <div class="card-head"><h3>Recent Answers</h3><a href="answeros-all-answers.html" class="link-btn" style="text-decoration:none;">View All <span class="icInline" data-ic="arrow"></span></a></div>
@@ -464,7 +492,7 @@
     </div>
 
     <!-- Row: Calendar / Score Improvement / Top Performance -->
-    <div class="grid3">
+    <div class="grid3" id="dashRow2">
       <section class="card">
         <div class="cal-head">
           <h3 style="font-size:14px;margin:0;">Consistency Calendar</h3>
@@ -485,6 +513,8 @@
         <div id="calDayDetail"><div class="cdd-empty">Click a day to see what you wrote — also filters Recent Answers.</div></div>
       </section>
 
+      <div class="grid-resizer"></div>
+
       <section class="card">
         <div class="card-head">
           <h3>Score Improvement</h3>
@@ -502,6 +532,8 @@
         <div class="insight-note" id="improveInsight" style="margin-top:10px;"></div>
       </section>
 
+      <div class="grid-resizer"></div>
+
       <section class="card">
         <div class="card-head"><h3>Top Performance</h3></div>
         <div style="font-size:10.5px;color:var(--ink-500);margin:-4px 0 8px 0;">Tap a card to jump there filtered</div>
@@ -514,7 +546,7 @@
     </div>
 
     <!-- Row: PYQ / Subject Progress / Overall / Study Time -->
-    <div class="grid4">
+    <div class="grid4" id="dashRow3">
       <section class="card">
         <div class="card-head"><h3>PYQ Tracker</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;background:#f3f0e6;padding:2px 7px;border-radius:5px;">Sample — not in sheet yet</span></div>
         <div style="display:flex;align-items:center;gap:14px;">
@@ -530,10 +562,14 @@
         <a href="answeros-pyq-tracker.html" style="display:block;text-align:center;background:var(--green-100);color:var(--green-800,#1c5c30);font-weight:700;font-size:12px;border-radius:8px;padding:8px;margin-top:12px;cursor:pointer;text-decoration:none;">Go to PYQ Tracker →</a>
       </section>
 
+      <div class="grid-resizer"></div>
+
       <section class="card">
         <div class="card-head"><h3>PYQ Progress (Subject-wise)</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;background:#f3f0e6;padding:2px 7px;border-radius:5px;">Sample</span></div>
         <div id="pyqProgress"></div>
       </section>
+
+      <div class="grid-resizer"></div>
 
       <section class="card">
         <div class="card-head"><h3>Overall Progress</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;background:#f3f0e6;padding:2px 7px;border-radius:5px;">Partly sample</span></div>
@@ -544,6 +580,8 @@
           <div class="stat-mini" id="overallList" style="flex:1;"></div>
         </div>
       </section>
+
+      <div class="grid-resizer"></div>
 
       <section class="card" style="border-color:#e8c9c0;">
         <div class="card-head"><h3>Focus Area</h3><span style="font-size:9.5px;color:var(--red,#b3402c);font-weight:700;background:#fbf1ee;padding:2px 7px;border-radius:5px;">Needs attention</span></div>
@@ -1395,7 +1433,84 @@ document.getElementById('refreshBtn').addEventListener('click', async ()=>{
     setTimeout(()=> toast.classList.remove('show'), 4500);
   }
 });
+
+/* ---------- resizable dashboard rows — drag the handles between cards ----------
+   Generic for any row with N cards + (N-1) .grid-resizer handles between them.
+   Widths are stored as fr-unit ratios (not px) so the row still fills 100% of its
+   container at any screen size — dragging only changes how that space is split
+   between the two cards on either side of the handle, not the row's total width.
+   Persists per-row via localStorage so layout choices survive reloads. */
+const resizableRows = []; // registry so a single "Reset Layout" click can restore every row
+function makeResizableRow(rowId, storageKey, defaultFr){
+  const row = document.getElementById(rowId);
+  if(!row) return;
+  const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+  const fr = (Array.isArray(saved) && saved.length===defaultFr.length) ? saved.slice() : defaultFr.slice();
+  function apply(){ fr.forEach((v,i)=> row.style.setProperty(`--c${i+1}`, v+'fr')); }
+  apply();
+  const handles = row.querySelectorAll('.grid-resizer');
+  handles.forEach((handle, idx)=>{
+    handle.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      const resizerTrackPx = handles.length * 14;
+      const usablePx = row.getBoundingClientRect().width - resizerTrackPx;
+      const totalFr = fr.reduce((s,v)=>s+v, 0);
+      const pxPerFr = usablePx / totalFr;
+      const startX = e.clientX;
+      const startLeft = fr[idx], startRight = fr[idx+1];
+      const MIN_FR = 0.55; // keeps a card from being dragged down to an unusably narrow sliver
+      function onMove(ev){
+        const deltaFr = (ev.clientX - startX) / pxPerFr;
+        let newLeft = startLeft + deltaFr, newRight = startRight - deltaFr;
+        if(newLeft < MIN_FR){ newRight -= (MIN_FR - newLeft); newLeft = MIN_FR; }
+        if(newRight < MIN_FR){ newLeft -= (MIN_FR - newRight); newRight = MIN_FR; }
+        fr[idx] = +newLeft.toFixed(3); fr[idx+1] = +newRight.toFixed(3);
+        apply();
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        handle.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        localStorage.setItem(storageKey, JSON.stringify(fr));
+        // let Chart.js know its canvas containers changed size — it won't always
+        // catch a pure CSS grid-track change on its own mid-drag.
+        window.dispatchEvent(new Event('resize'));
+      }
+      handle.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+  resizableRows.push({
+    reset(){
+      defaultFr.forEach((v,i)=> fr[i]=v);
+      apply();
+      localStorage.removeItem(storageKey);
+    }
+  });
+}
+makeResizableRow('dashRow1', 'answeros_row1_widths_v1', [1.3, 1.3, 1.15]);
+makeResizableRow('dashRow2', 'answeros_row2_widths_v1', [1.3, 1.3, 1.15]);
+makeResizableRow('dashRow3', 'answeros_row3_widths_v1', [1, 1, 1, 1]);
+
+document.getElementById('resetLayoutBtn').addEventListener('click', ()=>{
+  resizableRows.forEach(r=> r.reset());
+  window.dispatchEvent(new Event('resize'));
+  const toast = document.getElementById('refreshToast');
+  toast.textContent = 'Card layout reset to normal.';
+  toast.classList.add('show');
+  setTimeout(()=> toast.classList.remove('show'), 2500);
+});
+
+document.getElementById('openSheetBtn').addEventListener('click', ()=>{
+  const url = AnswerOSData.getConfig().sheetUrl;
+  if(url){ window.open(url, '_blank', 'noopener'); }
+  else { window.location.href = 'answeros-settings.html'; }
+});
 </script>
+
 
 <script>
 // AnswerOS shared data bootstrap: cached data renders immediately, then the Sheet is synced.
