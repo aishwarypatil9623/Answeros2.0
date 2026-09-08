@@ -178,13 +178,22 @@
 
   /* Quick stats strip */
   .quickstats{
-    display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;
+    display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;align-items:flex-start;
   }
+  .qs-group{display:flex;flex-direction:column;gap:6px;}
+  .qs-group-label{font-size:9px;font-weight:800;color:var(--ink-400,#9aa0a5);text-transform:uppercase;letter-spacing:.06em;padding-left:2px;}
+  .qs-group-chips{display:flex;flex-wrap:wrap;gap:8px;}
   .qs-chip{
     display:inline-flex;align-items:center;gap:7px;
     background:var(--card);border:1px solid var(--line);border-radius:10px;
     padding:7px 12px 7px 8px;box-shadow:var(--shadow);
   }
+  .qs-chip.clickable{cursor:pointer;transition:border-color .12s ease, transform .12s ease;}
+  .qs-chip.clickable:hover{border-color:var(--green-600);transform:translateY(-1px);}
+  .qs-chip.headline{padding:9px 14px 9px 9px;}
+  .qs-chip.headline .qs-icon{width:28px;height:28px;}
+  .qs-chip.headline .qs-icon svg{width:15px;height:15px;}
+  .qs-chip.headline .qs-val{font-size:17px;}
   .qs-icon{width:24px;height:24px;border-radius:7px;background:var(--green-50);color:var(--green-700);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .qs-icon svg{width:13px;height:13px;}
   .qs-val{font-size:14px;font-weight:800;line-height:1;letter-spacing:-0.01em;white-space:nowrap;}
@@ -774,46 +783,83 @@ if(currentStreak > 0) document.getElementById('icStreak').classList.add('pulse')
   document.getElementById('todayGoalBar').style.width = pct+'%';
 })();
 
-/* ---------- quick stats strip (compact chips, percentage scale) ---------- */
+/* ---------- quick stats strip (grouped, compact chips, percentage scale) ---------- */
 const words10Over = stats10 && stats10.avgWords!=null && stats10.avgWords > stats10.limit;
 const words15Over = stats15 && stats15.avgWords!=null && stats15.avgWords > stats15.limit;
-const qsData = [
-  ['file',totalAnswers,'','Total Answers'],
-  ['fire',currentStreak,'','Streak (Days)'],
-  ['trophy',longestStreak,'','Best Streak'],
-  ['star',avgScore.toFixed(0),'%','Avg Score'],
-  ['clock',avgDemand,'%','Avg Demand'],
-  ['up',bestScore.toFixed(0),'%','Best Score'],
-  ['down',worstScore.toFixed(0),'%','Worst Score'],
-  ['star10',stats10?stats10.avg.toFixed(0):'—','%',`10M Avg${stats10?` (n=${stats10.n})`:''}`],
-  ['star15',stats15?stats15.avg.toFixed(0):'—','%',`15M Avg${stats15?` (n=${stats15.n})`:''}`],
-  ['clipboard', stats10&&stats10.avgWords!=null?`${stats10.avgWords}/${stats10.limit}`:'—','','10M Words', words10Over],
-  ['clipboard', stats15&&stats15.avgWords!=null?`${stats15.avgWords}/${stats15.limit}`:'—','','15M Words', words15Over],
-  // tier badges — merged into Quick Stats as chips, using the exact badge images from
-  // the evaluation platform rather than a separate "Medal Tally" section.
-  ...TIERS.map(t=>['badge', ANSWERS.filter(a=>a.tier.key===t.key).length, '', t.label, false, t.key]),
-];
 const qsIconMap = {file:'file', fire:'flame', trophy:'trophy', star:'star', star10:'star', star15:'star', clock:'clock', up:'trendUp', down:'trendDown', redo:'refresh', clipboard:'clipboard'};
+
+// each chip: [icon, value, unit, label, warnFlag, action]
+// action (optional) drives what clicking the chip does — reuses filters/sections
+// that already exist elsewhere on this page instead of introducing new ones.
+const qsGroups = [
+  { label:'Overview', headline:true, chips:[
+    ['file', totalAnswers, '', 'Total Answers'],
+    ['fire', currentStreak, '', 'Streak (Days)'],
+    ['trophy', longestStreak, '', 'Best Streak'],
+  ]},
+  { label:'Score', chips:[
+    ['star', avgScore.toFixed(0), '%', 'Avg Score'],
+    ['clock', avgDemand, '%', 'Avg Demand'],
+    ['up', bestScore.toFixed(0), '%', 'Best Score', false, {type:'sort-recent', sort:'highest'}],
+    ['down', worstScore.toFixed(0), '%', 'Worst Score', false, {type:'sort-recent', sort:'lowest'}],
+  ]},
+  { label:'By Question Type', chips:[
+    ['star10', stats10?stats10.avg.toFixed(0):'—', '%', `10M Avg${stats10?` (n=${stats10.n})`:''}`, false, stats10?{type:'trend-filter', val:'10'}:null],
+    ['star15', stats15?stats15.avg.toFixed(0):'—', '%', `15M Avg${stats15?` (n=${stats15.n})`:''}`, false, stats15?{type:'trend-filter', val:'15'}:null],
+    ['clipboard', stats10&&stats10.avgWords!=null?`${stats10.avgWords}/${stats10.limit}`:'—', '', '10M Words vs Limit', words10Over],
+    ['clipboard', stats15&&stats15.avgWords!=null?`${stats15.avgWords}/${stats15.limit}`:'—', '', '15M Words vs Limit', words15Over],
+  ]},
+  { label:'Evaluator Badges', badges:true, chips:
+    TIERS.map(t=>['badge', ANSWERS.filter(a=>a.tier.key===t.key).length, '', t.label, false, {type:'tier-filter', key:t.key}])
+  },
+];
+
+function jumpToScoreTrend(typeVal){
+  document.getElementById('trendTypeFilter').value = typeVal;
+  renderScoreTrend();
+  document.getElementById('scoreTrend').scrollIntoView({behavior:'smooth', block:'center'});
+}
+function jumpToRecentSorted(sortVal){
+  document.getElementById('raSort').value = sortVal;
+  renderRecent();
+  document.getElementById('recentList').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
 function renderQuickStats(){
-  document.getElementById('quickStats').innerHTML = qsData.map(([ic,val,unit,label,warn,tierKey])=>{
-    if(ic==='badge'){
-      const t = TIERS.find(x=>x.key===tierKey);
-      const active = raTierFilter===tierKey ? ' active' : '';
-      return `<div class="qs-chip badge-chip${active}" data-tier="${tierKey}">
-        <div class="qs-badge-wrap" style="--glow:${t.color};"><img src="${t.img}" alt="${t.label} badge"></div>
-        <div><div class="qs-val">${val}</div><div class="qs-label">${label}</div></div>
+  document.getElementById('quickStats').innerHTML = qsGroups.map(g=>{
+    const chipsHtml = g.chips.map(([ic,val,unit,label,warn,action])=>{
+      if(ic==='badge'){
+        const t = TIERS.find(x=>x.key===action.key);
+        const active = raTierFilter===action.key ? ' active' : '';
+        return `<div class="qs-chip badge-chip${active}" data-action='${JSON.stringify(action)}'>
+          <div class="qs-badge-wrap" style="--glow:${t.color};"><img src="${t.img}" alt="${t.label} badge"></div>
+          <div><div class="qs-val">${val}</div><div class="qs-label">${label}</div></div>
+        </div>`;
+      }
+      const clickable = action ? ' clickable' : '';
+      const dataAttr = action ? `data-action='${JSON.stringify(action)}'` : '';
+      const headlineCls = g.headline ? ' headline' : '';
+      return `<div class="qs-chip${clickable}${headlineCls}" ${dataAttr}>
+        <div class="qs-icon" ${warn?'style="background:#fbeceb;color:#c0503a;"':''}>${iconSVG(qsIconMap[ic], 12)}</div>
+        <div><div class="qs-val" ${warn?'style="color:#c0503a;"':''}>${val}<span>${unit}</span>${warn?' ⚠':''}</div><div class="qs-label">${label}</div></div>
       </div>`;
-    }
-    return `<div class="qs-chip">
-      <div class="qs-icon" ${warn?'style="background:#fbeceb;color:#c0503a;"':''}>${iconSVG(qsIconMap[ic], 12)}</div>
-      <div><div class="qs-val" ${warn?'style="color:#c0503a;"':''}>${val}<span>${unit}</span>${warn?' ⚠':''}</div><div class="qs-label">${label}</div></div>
+    }).join('');
+    return `<div class="qs-group">
+      <div class="qs-group-label">${g.label}</div>
+      <div class="qs-group-chips">${chipsHtml}</div>
     </div>`;
   }).join('');
-  document.querySelectorAll('#quickStats .badge-chip').forEach(chip=>{
+
+  document.querySelectorAll('#quickStats [data-action]').forEach(chip=>{
     chip.addEventListener('click', ()=>{
-      raTierFilter = raTierFilter===chip.dataset.tier ? null : chip.dataset.tier;
-      renderQuickStats();
-      renderRecent();
+      const action = JSON.parse(chip.dataset.action);
+      if(action.type==='sort-recent') jumpToRecentSorted(action.sort);
+      else if(action.type==='trend-filter') jumpToScoreTrend(action.val);
+      else if(action.type==='tier-filter'){
+        raTierFilter = raTierFilter===action.key ? null : action.key;
+        renderQuickStats();
+        renderRecent();
+      }
     });
   });
 }
