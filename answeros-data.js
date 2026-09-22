@@ -118,7 +118,12 @@
   }
   function normalizeRows(rows){return (Array.isArray(rows)?rows:[]).map(normalizeRow).filter(r=>r.date||r.question||r.subject).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
   function stableHash(value){const text=JSON.stringify(value);let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16);}
-  function getAnswers(){const cached=readJSON(STORAGE.answers,null);if(Array.isArray(cached))return cached;if(Array.isArray(window.AnswerOSInitialData))return normalizeRows(window.AnswerOSInitialData);return [];}
+  function getAnswers(){
+    const cached=readJSON(STORAGE.answers,null);
+    if(Array.isArray(cached))return normalizeRows(cached);
+    if(Array.isArray(window.AnswerOSInitialData))return normalizeRows(window.AnswerOSInitialData);
+    return [];
+  }
   function getLastSync(){return localStorage.getItem(STORAGE.syncedAt)||'';}
   function buildUrl(config){if(!config.syncUrl)return '';const url=new URL(config.syncUrl);if(config.syncToken)url.searchParams.set('token',config.syncToken);url.searchParams.set('_ts',Date.now());return url.toString();}
   async function sync(options){const opts=Object.assign({reloadOnChange:false},options||{});const config=getConfig();if(!config.syncUrl)throw new Error('No Apps Script Web App URL configured.');const response=await fetch(buildUrl(config),{method:'GET',mode:'cors',cache:'no-store'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const payload=await response.json();if(!payload||payload.ok!==true||!Array.isArray(payload.rows))throw new Error(payload&&payload.error?payload.error:'Invalid AnswerOS API response.');const rows=normalizeRows(payload.rows);const nextHash=stableHash(rows);const previousHash=localStorage.getItem(STORAGE.hash)||'';const changed=nextHash!==previousHash;localStorage.setItem(STORAGE.answers,JSON.stringify(rows));localStorage.setItem(STORAGE.hash,nextHash);localStorage.setItem(STORAGE.syncedAt,new Date().toISOString());if(changed&&opts.reloadOnChange){const reloadKey=`answeros_reload_${nextHash}`;if(!sessionStorage.getItem(reloadKey)){sessionStorage.setItem(reloadKey,'1');setTimeout(()=>location.reload(),40);}}window.dispatchEvent(new CustomEvent('answeros:data-updated',{detail:{answers:rows,changed,count:rows.length,syncedAt:getLastSync()}}));return {rows,changed,count:rows.length,syncedAt:getLastSync()};}
