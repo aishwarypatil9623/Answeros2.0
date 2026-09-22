@@ -687,7 +687,9 @@ document.getElementById('darkToggle').addEventListener('click', function(){
 const ANSWERS = AnswerOSData.getAnswers();
 
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
-const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3'};
+const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', PSIRPAPER1:'#0f766e', PSIRPAPER2:'#0891b2'};
+const SUBJECT_LABELS = {PSIRPAPER1:'PSIR P1', PSIRPAPER2:'PSIR P2'};
+const subjectLabel = s => SUBJECT_LABELS[s] || s;
 
 /* ---------- evaluation-platform tier badges (Topper/Achiever/Learner/Beginner) ----------
    Thresholds observed from the platform's own Result screen, given in raw marks out of 15:
@@ -910,11 +912,11 @@ document.getElementById('subjectPerf').innerHTML = subjLabels.map(s=>{
   const share = Math.round(count/totalAnswers*100);
   const tier = scoreTier(avg);
   const trend = subjectTrend(s);
-  const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${s} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
+  const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${subjectLabel(s)} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
   const focusTag = s===subjWeakest.paper ? `<span class="subj-focus-tag">Focus</span>` : '';
   return `<div class="subj-leg-row" data-subj="${s}">
     <div class="subj-leg-dot" style="background:${SUBJECT_COLORS[s]};"></div>
-    <div class="subj-leg-label"><b>${s}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
+    <div class="subj-leg-label"><b>${subjectLabel(s)}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
     ${trendHtml}
     <div class="subj-leg-score" style="background:${tier.bg};color:${tier.fg};">${avg.toFixed(0)}%</div>
   </div>`;
@@ -937,15 +939,15 @@ const mostSkewed = subjRanked.slice().sort((a,b)=> Math.abs((b.n/totalAnswers*10
 const mostSkewedShare = Math.round(mostSkewed.n/totalAnswers*100);
 const isUnderPracticed = mostSkewedShare < idealShare*0.6;
 const balanceNote = subjLabels.length>=3 && Math.abs(mostSkewedShare-idealShare)>15
-  ? ` ${isUnderPracticed ? `<b>${mostSkewed.paper}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${mostSkewed.paper}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
+  ? ` ${isUnderPracticed ? `<b>${subjectLabel(mostSkewed.paper)}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${subjectLabel(mostSkewed.paper)}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
   : '';
-document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
+document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjectLabel(subjHeaviest.paper)}</b> (${subjHeaviest.n} answers), but <b>${subjectLabel(subjWeakest.paper)}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
 
 /* ---------- score trend line (functional filter: range + subject) ---------- */
 const sortedAll = [...ANSWERS].sort((a,b)=> new Date(a.date)-new Date(b.date));
 let scoreTrendChart = null;
 const trendSubjSelect = document.getElementById('trendSubjFilter');
-subjLabels.forEach(s=> trendSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
+subjLabels.forEach(s=> trendSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${subjectLabel(s)}</option>`));
 
 document.getElementById('trendLegend').innerHTML = TIERS.map(t=>
   `<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;"></span>${t.label}</span>`
@@ -1018,7 +1020,7 @@ function renderScoreTrend(){
     plugins:{legend:{display:false}, tooltip:{callbacks:{
       label:(ctx)=>{
         if(ctx.datasetIndex===1) return `3-answer avg: ${ctx.parsed.y}%`;
-        const a = data[ctx.dataIndex]; return `${ctx.parsed.y}% · ${a.max}-Mark · ${a.paper} · ${a.tier.label}`;
+        const a = data[ctx.dataIndex]; return `${ctx.parsed.y}% · ${a.max}-Mark · ${subjectLabel(a.paper)} · ${a.tier.label}`;
       }
     }}},
     scales:{ y:{min:0,max:100, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} },
@@ -1048,7 +1050,7 @@ document.getElementById('trendTypeFilter').addEventListener('change', renderScor
 
 /* ---------- recent answers list (filter + sort + limit + calendar cross-filter) ---------- */
 const raSubjSelect = document.getElementById('raSubjFilter');
-subjLabels.forEach(s=> raSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
+subjLabels.forEach(s=> raSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${subjectLabel(s)}</option>`));
 let raDateFilter = null; // set by clicking a Consistency Calendar day
 
 function renderRecent(){
@@ -1086,7 +1088,7 @@ function renderRecent(){
     const d = new Date(a.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const col = SUBJECT_COLORS[a.paper]||'#888';
     return `<div class="ra-row">
-      <div class="tag" style="background:${col}1a;color:${col};">${a.paper}</div>
+      <div class="tag" style="background:${col}1a;color:${col};">${subjectLabel(a.paper)}</div>
       <div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div>
       <div style="flex:1;min-width:0;">
         <div class="ra-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.subtopic}</div>
@@ -1157,7 +1159,7 @@ function renderCalDayDetail(){
     rows.map(a=>{
       const col = SUBJECT_COLORS[a.paper]||'#888';
       const score = (a.marks/a.max*100).toFixed(0);
-      return `<div class="cdd-row"><span class="cdd-tag" style="background:${col}1a;color:${col};">${a.paper}</span><div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div><span class="cdd-topic">${a.subtopic}</span><span class="cdd-score">${score}%</span></div>`;
+      return `<div class="cdd-row"><span class="cdd-tag" style="background:${col}1a;color:${col};">${subjectLabel(a.paper)}</span><div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div><span class="cdd-topic">${a.subtopic}</span><span class="cdd-score">${score}%</span></div>`;
     }).join('');
 }
 renderCalendar();
