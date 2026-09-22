@@ -35,7 +35,12 @@
     localStorage.setItem(STORAGE.notes,JSON.stringify(all));
     return all;
   }
-  function normalizePaper(value){return String(value==null?'':value).trim().replace(/\s+/g,'').toUpperCase();}
+  function normalizePaper(value){
+    const raw=String(value==null?'':value).trim().toUpperCase().replace(/\s+/g,' ');
+    if(/^PSIR\s*(?:PAPER\s*)?1$/.test(raw)||raw==='PSIRPAPER1')return 'PSIR P1';
+    if(/^PSIR\s*(?:PAPER\s*)?2$/.test(raw)||raw==='PSIRPAPER2')return 'PSIR P2';
+    return raw.replace(/\s+/g,'');
+  }
   function toNumber(value){if(value===''||value==null)return null;const n=Number(String(value).replace(/,/g,'').replace('%',''));return Number.isFinite(n)?n:null;}
   function toDateString(value){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
   function parseList(value){if(!value)return [];return String(value).split(/\r?\n+/).map(s=>s.trim()).map(s=>s.replace(/^(?:[-•*]|[✓✕❌🔼❎❗])\s*/u,'').trim()).filter(Boolean);}
