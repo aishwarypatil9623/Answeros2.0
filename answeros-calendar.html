@@ -217,7 +217,7 @@
 const ANSWERS = AnswerOSData.getAnswers();
 ANSWERS.forEach((a,i)=>{ a.score = a.marks/a.max*10; a.id = 'ans_'+i; });
 
-const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', PSIR:'#22a3a3', Essay:'#c98a1f'};
+const PAPER_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', PSIR:'#22a3a3', Essay:'#c98a1f', 'PSIR P1':'#0f766e', 'PSIR P2':'#0891b2'};
 function scoreTier(s){ return s>=6.5?{bg:'#e6f4ea',fg:'#1c5c30'}:s>=4.5?{bg:'#fbf5e8',fg:'#8a6212'}:{bg:'#fbf1ee',fg:'#b3402c'}; }
 
 const TODAY = AnswerOSData.today(); // matches "today" used consistently across AnswerOS
