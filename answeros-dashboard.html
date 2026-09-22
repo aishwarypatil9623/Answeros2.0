@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <script src="answeros-initial-data.js"></script>
-<script src="answeros-data.js?v=20260922-p2"></script>
+<script src="answeros-data.js"></script>
 <meta charset="UTF-8" />
 <title>AnswerOS — Answer Writing Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -201,6 +201,8 @@
   .qs-label{font-size:9.5px;color:var(--ink-500);white-space:nowrap;margin-top:1px;}
 
   .grid3{display:grid;grid-template-columns: var(--c1,1.3fr) 14px var(--c2,1.3fr) 14px var(--c3,1.15fr);gap:0 0;margin-bottom:16px;align-items:stretch;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  @media (max-width:1400px){ .grid2{grid-template-columns:1fr;} }
   .grid3b{display:grid;grid-template-columns: 1.3fr 1.3fr 1fr;gap:16px;margin-bottom:16px;}
   .grid4{display:grid;grid-template-columns: var(--c1,1fr) 14px var(--c2,1fr) 14px var(--c3,1fr) 14px var(--c4,1fr);gap:0 0;margin-bottom:16px;}
   /* draggable handles between cards in a resizable row — width matches the row's
@@ -239,6 +241,14 @@
   .subj-trend.flat{color:var(--ink-300);}
   .subj-focus-tag{font-size:8.5px;font-weight:800;background:#fbf1ee;color:#b3402c;padding:2px 6px;border-radius:5px;margin-left:6px;letter-spacing:.02em;text-transform:uppercase;}
   .insight-note{background:var(--green-50);border-left:3px solid var(--green-600);border-radius:0 8px 8px 0;padding:9px 12px;font-size:11.5px;color:var(--ink-900);line-height:1.5;margin-top:14px;}
+  .insight-note.flag{background:var(--red-50);border-left-color:var(--red);color:#7a3226;}
+  .weak-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .weak-row:last-child{border-bottom:none;}
+  .weak-rank{width:22px;height:22px;border-radius:50%;background:var(--red-50);color:var(--red);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .weak-main{flex:1;min-width:0;}
+  .weak-name{font-size:12.5px;font-weight:700;color:var(--ink-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .weak-meta{font-size:10.5px;color:var(--ink-500);margin-top:1px;}
+  .weak-score{font-size:15px;font-weight:800;flex-shrink:0;}
   .insight-note b{color:var(--green-800);}
 
   /* Recent answers list */
@@ -271,9 +281,25 @@
   .cal-1{background:#cdeada;color:var(--green-800,#1c5c30);}
   .cal-2{background:#7cc298;color:#0d3d1c;}
   .cal-3{background:var(--green-700);color:#fff;font-weight:700;}
+  .cal-4{background:var(--green-900);color:#fff;font-weight:700;}
+  .heatmap-cell.today{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
   .cal-legend{display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap;}
   .cal-legend .item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink-500);}
   .cal-legend .sw{width:11px;height:11px;border-radius:3px;}
+
+  /* GitHub-style contribution heatmap */
+  .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
+  .heatmap-months{display:flex;font-size:10px;color:var(--ink-500);margin-bottom:4px;margin-left:26px;position:relative;height:14px;}
+  .heatmap-months span{position:absolute;white-space:nowrap;}
+  .heatmap-body{display:flex;gap:4px;}
+  .heatmap-daylabels{display:flex;flex-direction:column;gap:2.5px;font-size:9px;color:var(--ink-500);width:22px;flex-shrink:0;padding-top:1px;}
+  .heatmap-daylabels span{height:10px;line-height:10px;}
+  .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,10px);gap:2.5px;}
+  .heatmap-cell{width:10px;height:10px;border-radius:2px;cursor:default;}
+  .heatmap-cell[data-date]{cursor:pointer;}
+  .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
+  .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
+  .activity-mix-divider{border-top:1px solid var(--line);margin:16px 0 14px 0;}
   #calDayDetail{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:11.5px;}
   #calDayDetail .cdd-empty{color:var(--ink-500);}
   #calDayDetail .cdd-date{font-weight:700;font-size:12px;margin-bottom:6px;}
@@ -431,6 +457,7 @@
     <div class="quickstats" id="quickStats"></div>
 
     <!-- Row: Subject Distribution / Score Trend / Recent Answers -->
+    <!-- Row: Subject Distribution / Score Trend / Recent Answers -->
     <div class="grid3" id="dashRow1">
       <section class="card">
         <div class="card-head"><h3>Subject Performance</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;">volume + avg score</span></div>
@@ -503,23 +530,34 @@
     <!-- Row: Calendar / Score Improvement / Top Performance -->
     <div class="grid3" id="dashRow2">
       <section class="card">
-        <div class="cal-head">
-          <h3 style="font-size:14px;margin:0;">Consistency Calendar</h3>
-          <div class="cal-nav">
-            <div class="cal-nav-btn" id="calPrev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></div>
-            <b id="calMonth">August 2026</b>
-            <div class="cal-nav-btn" id="calNext"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>
-            <div class="cal-today-btn" id="calToday">Today</div>
+        <div class="card-head"><h3 id="heatmapHeader" style="font-size:14px;margin:0;">Contributions in the last year</h3></div>
+        <div class="heatmap-scroll">
+          <div class="heatmap-months" id="heatmapMonths"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-daylabels">
+              <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+            </div>
+            <div class="heatmap-grid" id="heatmapGrid"></div>
           </div>
         </div>
-        <table class="cal" id="calTable"></table>
-        <div class="cal-legend">
-          <div class="item"><div class="sw" style="background:#eef1ee;"></div>No answer</div>
-          <div class="item"><div class="sw" style="background:#cdeada;"></div>1 Answer</div>
-          <div class="item"><div class="sw" style="background:#7cc298;"></div>2 Answers</div>
-          <div class="item"><div class="sw" style="background:var(--green-700);"></div>3+ Answers</div>
+        <div class="cal-legend" style="margin-top:8px;gap:4px;padding-top:0;border-top:none;justify-content:flex-end;">
+          <span style="font-size:10px;color:var(--ink-500);">Less</span>
+          <div class="sw" style="background:#eef1ee;"></div>
+          <div class="sw" style="background:#cdeada;"></div>
+          <div class="sw" style="background:#7cc298;"></div>
+          <div class="sw" style="background:var(--green-700);"></div>
+          <div class="sw" style="background:var(--green-900);"></div>
+          <span style="font-size:10px;color:var(--ink-500);">More</span>
         </div>
         <div id="calDayDetail"><div class="cdd-empty">Click a day to see what you wrote — also filters Recent Answers.</div></div>
+
+        <div class="activity-mix-divider"></div>
+        <div class="card-head" style="margin-bottom:6px;"><h3 style="font-size:13px;">Activity Mix</h3></div>
+        <div class="card-sub" style="font-size:10.5px;color:var(--ink-500);margin:-6px 0 8px 0;">How your study effort splits across the three things AnswerOS tracks — Answers, Revisions and Notes.</div>
+        <div style="max-width:230px;margin:0 auto;">
+          <canvas id="activityMixChart" height="200"></canvas>
+        </div>
+        <div class="insight-note" id="activityMixInsight" style="margin-top:8px;"></div>
       </section>
 
       <div class="grid-resizer"></div>
@@ -554,7 +592,7 @@
       </section>
     </div>
 
-    <!-- Row: PYQ / Subject Progress / Overall / Study Time -->
+    <!-- Row: PYQ / Subject Progress / Overall / Focus Area -->
     <div class="grid4" id="dashRow3">
       <section class="card">
         <div class="card-head"><h3>PYQ Tracker</h3><span style="font-size:9.5px;color:var(--ink-500);font-weight:600;background:#f3f0e6;padding:2px 7px;border-radius:5px;">Sample — not in sheet yet</span></div>
@@ -595,6 +633,26 @@
       <section class="card" style="border-color:#e8c9c0;">
         <div class="card-head"><h3>Focus Area</h3><span style="font-size:9.5px;color:var(--red,#b3402c);font-weight:700;background:#fbf1ee;padding:2px 7px;border-radius:5px;">Needs attention</span></div>
         <div id="focusArea"></div>
+      </section>
+    </div>
+
+    <!-- Row: Recurring Feedback Gap / Weakest Subtopics (ported from Analytics) -->
+    <div class="grid2">
+      <section class="card">
+        <div class="card-head"><h3>Recurring Feedback Gap</h3></div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <div style="position:relative;width:120px;height:120px;flex-shrink:0;">
+            <canvas id="dashGapDonut"></canvas>
+          </div>
+          <div class="legend-list" id="dashGapLegend"></div>
+        </div>
+        <div class="insight-note flag" id="dashGapInsight"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h3>Weakest Subtopics — Revision Priority</h3></div>
+        <div class="card-sub" style="font-size:11.5px;color:var(--ink-500);margin:-8px 0 12px 0;">Syllabus themes scoring lowest (min. 2 attempts) — where a targeted re-read pays off most before the exam.</div>
+        <div id="dashWeakSubtopics"></div>
       </section>
     </div>
 
@@ -687,9 +745,7 @@ document.getElementById('darkToggle').addEventListener('click', function(){
 const ANSWERS = AnswerOSData.getAnswers();
 
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
-const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', ['PSIR P1']:'#0f766e', ['PSIR P2']:'#0891b2'};
-const SUBJECT_LABELS = {};
-const subjectLabel = s => s;
+const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3'};
 
 /* ---------- evaluation-platform tier badges (Topper/Achiever/Learner/Beginner) ----------
    Thresholds observed from the platform's own Result screen, given in raw marks out of 15:
@@ -912,11 +968,11 @@ document.getElementById('subjectPerf').innerHTML = subjLabels.map(s=>{
   const share = Math.round(count/totalAnswers*100);
   const tier = scoreTier(avg);
   const trend = subjectTrend(s);
-  const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${subjectLabel(s)} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
+  const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${s} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
   const focusTag = s===subjWeakest.paper ? `<span class="subj-focus-tag">Focus</span>` : '';
   return `<div class="subj-leg-row" data-subj="${s}">
     <div class="subj-leg-dot" style="background:${SUBJECT_COLORS[s]};"></div>
-    <div class="subj-leg-label"><b>${subjectLabel(s)}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
+    <div class="subj-leg-label"><b>${s}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
     ${trendHtml}
     <div class="subj-leg-score" style="background:${tier.bg};color:${tier.fg};">${avg.toFixed(0)}%</div>
   </div>`;
@@ -939,15 +995,15 @@ const mostSkewed = subjRanked.slice().sort((a,b)=> Math.abs((b.n/totalAnswers*10
 const mostSkewedShare = Math.round(mostSkewed.n/totalAnswers*100);
 const isUnderPracticed = mostSkewedShare < idealShare*0.6;
 const balanceNote = subjLabels.length>=3 && Math.abs(mostSkewedShare-idealShare)>15
-  ? ` ${isUnderPracticed ? `<b>${subjectLabel(mostSkewed.paper)}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${subjectLabel(mostSkewed.paper)}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
+  ? ` ${isUnderPracticed ? `<b>${mostSkewed.paper}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${mostSkewed.paper}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
   : '';
-document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjectLabel(subjHeaviest.paper)}</b> (${subjHeaviest.n} answers), but <b>${subjectLabel(subjWeakest.paper)}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
+document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjHeaviest.paper}</b> (${subjHeaviest.n} answers), but <b>${subjWeakest.paper}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
 
 /* ---------- score trend line (functional filter: range + subject) ---------- */
 const sortedAll = [...ANSWERS].sort((a,b)=> new Date(a.date)-new Date(b.date));
 let scoreTrendChart = null;
 const trendSubjSelect = document.getElementById('trendSubjFilter');
-subjLabels.forEach(s=> trendSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${subjectLabel(s)}</option>`));
+subjLabels.forEach(s=> trendSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
 
 document.getElementById('trendLegend').innerHTML = TIERS.map(t=>
   `<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;"></span>${t.label}</span>`
@@ -1020,7 +1076,7 @@ function renderScoreTrend(){
     plugins:{legend:{display:false}, tooltip:{callbacks:{
       label:(ctx)=>{
         if(ctx.datasetIndex===1) return `3-answer avg: ${ctx.parsed.y}%`;
-        const a = data[ctx.dataIndex]; return `${ctx.parsed.y}% · ${a.max}-Mark · ${subjectLabel(a.paper)} · ${a.tier.label}`;
+        const a = data[ctx.dataIndex]; return `${ctx.parsed.y}% · ${a.max}-Mark · ${a.paper} · ${a.tier.label}`;
       }
     }}},
     scales:{ y:{min:0,max:100, grid:{color:'#eef1ee'}}, x:{grid:{display:false}} },
@@ -1050,7 +1106,7 @@ document.getElementById('trendTypeFilter').addEventListener('change', renderScor
 
 /* ---------- recent answers list (filter + sort + limit + calendar cross-filter) ---------- */
 const raSubjSelect = document.getElementById('raSubjFilter');
-subjLabels.forEach(s=> raSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${subjectLabel(s)}</option>`));
+subjLabels.forEach(s=> raSubjSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
 let raDateFilter = null; // set by clicking a Consistency Calendar day
 
 function renderRecent(){
@@ -1088,7 +1144,7 @@ function renderRecent(){
     const d = new Date(a.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const col = SUBJECT_COLORS[a.paper]||'#888';
     return `<div class="ra-row">
-      <div class="tag" style="background:${col}1a;color:${col};">${subjectLabel(a.paper)}</div>
+      <div class="tag" style="background:${col}1a;color:${col};">${a.paper}</div>
       <div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div>
       <div style="flex:1;min-width:0;">
         <div class="ra-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.subtopic}</div>
@@ -1104,44 +1160,52 @@ document.getElementById('raSort').addEventListener('change', renderRecent);
 document.getElementById('raLimit').addEventListener('change', renderRecent);
 document.getElementById('raDateChipClear').addEventListener('click', ()=>{ raDateFilter=null; raTierFilter=null; renderRecent(); renderCalendar(); renderCalDayDetail(); renderQuickStats(); });
 
-/* ---------- consistency calendar (functional month nav) ---------- */
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const latestAnswerDate = ANSWERS.length ? new Date(ANSWERS[0].date) : AnswerOSData.today();
-let calYear = latestAnswerDate.getFullYear(), calMonth = latestAnswerDate.getMonth();
+/* ---------- GitHub-style contribution heatmap (last ~52 weeks) ---------- */
 const TODAY_KEY = AnswerOSData.today().toISOString().slice(0,10);
-function renderCalendar(){
-  const first = new Date(calYear,calMonth,1);
-  const startDow = (first.getDay()+6)%7; // Mon=0
-  const daysInMonth = new Date(calYear,calMonth+1,0).getDate();
-  const countByDay = {};
-  ANSWERS.forEach(a=>{ const d=new Date(a.date); if(d.getFullYear()===calYear && d.getMonth()===calMonth) countByDay[d.getDate()] = (countByDay[d.getDate()]||0)+1; });
-  let html = '<tr>'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<th>${d}</th>`).join('')+'</tr>';
-  let day = 1 - startDow;
-  for(let w=0; w<6; w++){
-    html += '<tr>';
-    for(let d=0; d<7; d++){
-      if(day<1 || day>daysInMonth){ html += `<td></td>`; }
-      else{
-        const c = countByDay[day]||0;
-        const cls = c===0?'cal-0':c===1?'cal-1':c===2?'cal-2':'cal-3';
-        const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const isToday = dateStr===TODAY_KEY ? 'today' : '';
-        const isSelected = dateStr===raDateFilter ? 'selected' : '';
-        const clickable = c>0 ? `data-date="${dateStr}"` : '';
-        html += `<td><div class="day-cell ${cls} ${isToday} ${isSelected}" ${clickable}><span class="day-num">${day}</span></div></td>`;
-      }
-      day++;
+const HEATMAP_WEEKS = 52;
+function renderHeatmap(){
+  const today = AnswerOSData.today();
+  const start = new Date(today); start.setDate(start.getDate() - HEATMAP_WEEKS*7);
+  start.setDate(start.getDate() - start.getDay()); // roll back to the preceding Sunday so columns are full weeks
+
+  const countByDate = {};
+  ANSWERS.forEach(a=>{ countByDate[a.date] = (countByDate[a.date]||0)+1; });
+
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let html = '';
+  let monthLabels = [];
+  let col = 0, lastMonth = -1;
+  let totalInWindow = 0;
+  const d = new Date(start);
+  while(d <= today){
+    if(d.getDay()===0 && d.getMonth()!==lastMonth){
+      monthLabels.push({label:MONTH_SHORT[d.getMonth()], col});
+      lastMonth = d.getMonth();
     }
-    html += '</tr>';
-    if(day>daysInMonth) break;
+    const dateStr = AnswerOSData.formatDate(d);
+    const c = countByDate[dateStr] || 0;
+    if(d >= start) totalInWindow += c;
+    const cls = c===0?'cal-0':c===1?'cal-1':c===2?'cal-2':c===3?'cal-3':'cal-4';
+    const isToday = dateStr===TODAY_KEY ? ' today' : '';
+    const isSelected = dateStr===raDateFilter ? ' selected' : '';
+    const clickAttr = c>0 ? `data-date="${dateStr}"` : '';
+    const dLabel = d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+    const title = `${c} answer${c===1?'':'s'} on ${dLabel}`;
+    html += `<div class="heatmap-cell ${cls}${isToday}${isSelected}" ${clickAttr} title="${title}"></div>`;
+    if(d.getDay()===6) col++;
+    d.setDate(d.getDate()+1);
   }
-  document.getElementById('calTable').innerHTML = html;
-  document.getElementById('calMonth').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
-  document.querySelectorAll('#calTable .day-cell[data-date]').forEach(cell=>{
+  document.getElementById('heatmapGrid').innerHTML = html;
+  document.getElementById('heatmapMonths').innerHTML = monthLabels.map(m=>
+    `<span style="left:${m.col*12.5}px;">${m.label}</span>`
+  ).join('');
+  document.getElementById('heatmapHeader').textContent = `${totalInWindow} answers in the last year`;
+
+  document.querySelectorAll('#heatmapGrid .heatmap-cell[data-date]').forEach(cell=>{
     cell.addEventListener('click', ()=>{
       raDateFilter = (raDateFilter === cell.dataset.date) ? null : cell.dataset.date;
       renderRecent();
-      renderCalendar();
+      renderHeatmap();
       renderCalDayDetail();
     });
   });
@@ -1159,20 +1223,45 @@ function renderCalDayDetail(){
     rows.map(a=>{
       const col = SUBJECT_COLORS[a.paper]||'#888';
       const score = (a.marks/a.max*100).toFixed(0);
-      return `<div class="cdd-row"><span class="cdd-tag" style="background:${col}1a;color:${col};">${subjectLabel(a.paper)}</span><div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div><span class="cdd-topic">${a.subtopic}</span><span class="cdd-score">${score}%</span></div>`;
+      return `<div class="cdd-row"><span class="cdd-tag" style="background:${col}1a;color:${col};">${a.paper}</span><div class="medal-mini" title="${a.tier.label}"><img src="${a.tier.img}" alt="${a.tier.label}"></div><span class="cdd-topic">${a.subtopic}</span><span class="cdd-score">${score}%</span></div>`;
     }).join('');
 }
-renderCalendar();
+renderHeatmap();
 renderCalDayDetail();
-document.getElementById('calPrev').addEventListener('click', ()=>{
-  calMonth--; if(calMonth<0){ calMonth=11; calYear--; } renderCalendar();
-});
-document.getElementById('calNext').addEventListener('click', ()=>{
-  calMonth++; if(calMonth>11){ calMonth=0; calYear++; } renderCalendar();
-});
-document.getElementById('calToday').addEventListener('click', ()=>{
-  const now = AnswerOSData.today(); calYear=now.getFullYear(); calMonth=now.getMonth(); renderCalendar();
-});
+
+/* ---------- Activity Mix radar — real split across the 3 things AnswerOS tracks ---------- */
+function renderActivityMix(){
+  const revisionState = AnswerOSData.getRevisionState ? AnswerOSData.getRevisionState() : {};
+  const reviewedCount = Object.values(revisionState).filter(r=>r.reviewed).length;
+  const notesCount = (AnswerOSData.getNotes ? AnswerOSData.getNotes() : []).length;
+  const total = totalAnswers + reviewedCount + notesCount;
+  const insightEl = document.getElementById('activityMixInsight');
+  if(total===0){
+    document.getElementById('activityMixChart').style.display='none';
+    insightEl.textContent = 'Not enough activity yet to show a mix.';
+    return;
+  }
+  const pct = x => Math.round(x/total*100);
+  const dataVals = [pct(totalAnswers), pct(reviewedCount), pct(notesCount)];
+  new Chart(document.getElementById('activityMixChart'), {
+    type:'radar',
+    data:{ labels:['Answers','Revisions','Notes'], datasets:[{
+      data: dataVals, backgroundColor:'rgba(44,138,70,0.25)', borderColor:'#2c8a46',
+      pointBackgroundColor:'#2c8a46', pointRadius:3, borderWidth:2
+    }]},
+    options:{
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>`${ctx.label}: ${ctx.parsed.r}%`}}},
+      scales:{ r:{ min:0, max:100, ticks:{display:false, stepSize:25}, grid:{color:'#eef1ee'}, angleLines:{color:'#eef1ee'}, pointLabels:{font:{size:10.5}, color:'var(--ink-700)'} } }
+    }
+  });
+  const maxVal = Math.max(...dataVals);
+  const topLabel = ['Answers','Revisions','Notes'][dataVals.indexOf(maxVal)];
+  let note = `<b>${topLabel}</b> makes up the largest share of your tracked activity (${maxVal}%).`;
+  if(reviewedCount===0) note += ' No revisions started yet — visit Revision Hub.';
+  else if(notesCount===0) note += ' No notes indexed yet — visit Notes.';
+  insightEl.innerHTML = note;
+}
+renderActivityMix();
 
 /* ---------- score improvement bar (functional: real weekly buckets from ANSWERS) ---------- */
 function mondayOf(dateStr){
@@ -1393,19 +1482,19 @@ const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" style="width:au
 const tierBreakdown = TIERS.map(t=> ({t, n: weakestPaperRows.filter(a=>a.tier.key===t.key).length})).filter(x=>x.n>0);
 
 document.getElementById('focusArea').innerHTML = `
-  <div class="focus-headline">${subjectLabel(weakestPaper[0])} ${trendHtml}<span>· ${weakestPaper[1].toFixed(0)}% avg</span></div>
+  <div class="focus-headline">${weakestPaper[0]} ${trendHtml}<span>· ${weakestPaper[1].toFixed(0)}% avg</span></div>
   <div class="focus-sub">Your lowest-scoring paper, across ${weakestPaperCount} answers.</div>
   <div class="focus-tier-chips">${tierBreakdown.map(x=>`<div class="focus-tier-chip"><img src="${x.t.img}" alt="${x.t.label}">${x.n} ${x.t.label}</div>`).join('')}</div>
   ${weakSubtopicEntry ? `
   <div class="focus-topic-row" id="focusTopicRow">
     <div style="flex:1;min-width:0;">
       <div class="focus-topic-name">${weakSubtopicEntry.name}</div>
-      <div class="focus-topic-meta">${subjectLabel(weakSubtopicEntry.paper)} · ${weakSubtopicEntry.rows.length} attempts · weakest specific theme</div>
+      <div class="focus-topic-meta">${weakSubtopicEntry.paper} · ${weakSubtopicEntry.rows.length} attempts · weakest specific theme</div>
     </div>
     <div class="cc-score sm" style="background:#fbf1ee;color:#b3402c;font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px;">${weakSubtopicEntry.avg.toFixed(0)}%</div>
   </div>` : ''}
   <div class="focus-note">🔁 Recurring gap: <b>${topGap[0]}</b> flagged in ${topGap[1]} of ${totalAnswers} answers (${topGapPct}%) — this is costing you marks across papers, not just ${weakestPaper[0]}.</div>
-  <div class="focus-secondary">Prioritize ${subjectLabel(weakestPaper[0])} revision and deliberately add ${topGap[0].toLowerCase()} to your next 3 answers.</div>
+  <div class="focus-secondary">Prioritize ${weakestPaper[0]} revision and deliberately add ${topGap[0].toLowerCase()} to your next 3 answers.</div>
 `;
 document.getElementById('focusArea').querySelector('.focus-headline').style.cursor = 'pointer';
 document.getElementById('focusArea').querySelector('.focus-headline').addEventListener('click', ()=> jumpToSubject(weakestPaper[0]));
@@ -1415,6 +1504,52 @@ if(weakSubtopicEntry){
     renderRecent();
     document.getElementById('recentList').scrollIntoView({behavior:'smooth', block:'center'});
   });
+}
+
+/* ---------- Recurring Feedback Gap (ported from Analytics) ---------- */
+const dashGapCounts = {};
+ANSWERS.forEach(a=>{ if(a.gapCategory) dashGapCounts[a.gapCategory] = (dashGapCounts[a.gapCategory]||0)+1; });
+const dashGapLabels = Object.entries(dashGapCounts).sort((a,b)=>b[1]-a[1]);
+const dashGapColors = ['#b3402c','#c98a1f','#3b6fd5','#7a4fd5','#2c8a46','#22a3a3'];
+new Chart(document.getElementById('dashGapDonut'), {
+  type:'doughnut',
+  data:{ labels: dashGapLabels.map(g=>g[0]), datasets:[{ data: dashGapLabels.map(g=>g[1]), backgroundColor: dashGapLabels.map((_,i)=>dashGapColors[i%dashGapColors.length]), borderWidth:3, borderColor:'#fff' }] },
+  options:{ cutout:'65%', plugins:{legend:{display:false}} }
+});
+document.getElementById('dashGapLegend').innerHTML = dashGapLabels.map((g,i)=>{
+  const pct = Math.round(g[1]/totalAnswers*100);
+  return `<div class="legend-row"><div class="dot" style="background:${dashGapColors[i%dashGapColors.length]};"></div><div class="lbl">${g[0]}</div><div class="val">${g[1]}</div><div class="pct">${pct}%</div></div>`;
+}).join('');
+const dashTopGap = dashGapLabels[0];
+const dashTopGapPct = Math.round(dashTopGap[1]/totalAnswers*100);
+document.getElementById('dashGapInsight').innerHTML = `<b>${dashTopGap[0]}</b> is flagged in ${dashTopGap[1]} of ${totalAnswers} answers (${dashTopGapPct}%) — spread across multiple papers, not one. This is a technique habit, not a knowledge gap in any single subject.`;
+
+/* ---------- Weakest Subtopics — Revision Priority (ported from Analytics) ---------- */
+const dashSubtopicGroups = {};
+ANSWERS.forEach(a=>{
+  dashSubtopicGroups[a.subtopic] = dashSubtopicGroups[a.subtopic] || [];
+  dashSubtopicGroups[a.subtopic].push(a);
+});
+const dashWeakList = Object.entries(dashSubtopicGroups)
+  .filter(([,rows])=>rows.length>=2)
+  .map(([name,rows])=>({ name, n:rows.length, avg: rows.reduce((s,a)=>s+a.marks/a.max*100,0)/rows.length, paper: rows[0].paper }))
+  .sort((a,b)=>a.avg-b.avg)
+  .slice(0,5);
+const dashWeakBox = document.getElementById('dashWeakSubtopics');
+if(dashWeakList.length){
+  dashWeakBox.innerHTML = dashWeakList.map((w,i)=>{
+    const tier = w.avg>=65?{bg:'#e6f4ea',fg:'#1c5c30'}:w.avg>=45?{bg:'#fbf5e8',fg:'#8a6212'}:{bg:'#fbf1ee',fg:'#b3402c'};
+    return `<div class="weak-row" data-subj="${w.paper}" style="cursor:pointer;">
+      <div class="weak-rank">${i+1}</div>
+      <div class="weak-main"><div class="weak-name">${w.name}</div><div class="weak-meta">${w.paper} · ${w.n} attempts</div></div>
+      <div class="weak-score" style="color:${tier.fg};">${w.avg.toFixed(0)}%</div>
+    </div>`;
+  }).join('');
+  dashWeakBox.querySelectorAll('.weak-row').forEach(row=>{
+    row.addEventListener('click', ()=> jumpToSubject(row.dataset.subj));
+  });
+} else {
+  dashWeakBox.innerHTML = `<div style="padding:20px 0;text-align:center;color:var(--ink-500);font-size:12.5px;">No subtopic has 2+ attempts yet — this list needs repeats on the same theme to be meaningful.</div>`;
 }
 
 /* ---------- bottom strip ---------- */
@@ -1565,6 +1700,4 @@ document.getElementById('openSheetBtn').addEventListener('click', ()=>{
 AnswerOSData.initPage({reloadOnChange:true});
 </script>
 </body>
-
-<!-- AnswerOS Pages refresh: PSIR display labels verified 2026-09-22 -->
 </html>
