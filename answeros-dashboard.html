@@ -687,9 +687,9 @@ document.getElementById('darkToggle').addEventListener('click', function(){
 const ANSWERS = AnswerOSData.getAnswers();
 
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
-const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', PSIRPAPER1:'#0f766e', PSIRPAPER2:'#0891b2'};
-const SUBJECT_LABELS = {PSIRPAPER1:'PSIR P1', PSIRPAPER2:'PSIR P2'};
-const subjectLabel = s => SUBJECT_LABELS[s] || s;
+const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', ['PSIR P1']:'#0f766e', ['PSIR P2']:'#0891b2'};
+const SUBJECT_LABELS = {};
+const subjectLabel = s => s;
 
 /* ---------- evaluation-platform tier badges (Topper/Achiever/Learner/Beginner) ----------
    Thresholds observed from the platform's own Result screen, given in raw marks out of 15:
