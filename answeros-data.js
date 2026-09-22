@@ -36,12 +36,21 @@
     return all;
   }
   function normalizePaper(value){
-    const raw=String(value==null?'':value).trim().toUpperCase().replace(/\s+/g,' ');
-    // Canonicalize all common PSIR paper spellings (PSIR P1, PSIR Paper 1,
-    // PSIR-Paper-1, PSIRPAPER1, etc.) so source formatting cannot leak into the UI.
-    if(/^PSIR\s*(?:P\s*|PAPER\s*[-]?\s*)?1$/.test(raw)||raw==='PSIRPAPER1'||raw==='PSIRP1')return 'PSIR P1';
-    if(/^PSIR\s*(?:P\s*|PAPER\s*[-]?\s*)?2$/.test(raw)||raw==='PSIRPAPER2'||raw==='PSIRP2')return 'PSIR P2';
-    return raw.replace(/\s+/g,'');
+    const raw=String(value==null?'':value).trim().toUpperCase();
+    // Canonical PSIR labels at the data-ingestion boundary. Punctuation,
+    // spacing, separators, leading zeros, and common number words/roman numerals
+    // are normalized first so source formatting can never leak into the UI.
+    const cleaned=raw
+      .replace(/[‐‑‒–—−]/g,'-')
+      .replace(/[^A-Z0-9IV]+/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+    const compact=cleaned.replace(/\s+/g,'');
+    const p1=/^PSIR(?:P|PAPER)?(?:0*1|I|ONE)$/;
+    const p2=/^PSIR(?:P|PAPER)?(?:0*2|II|TWO)$/;
+    if(p1.test(compact))return 'PSIR P1';
+    if(p2.test(compact))return 'PSIR P2';
+    return cleaned.replace(/\s+/g,'');
   }
   function toNumber(value){if(value===''||value==null)return null;const n=Number(String(value).replace(/,/g,'').replace('%',''));return Number.isFinite(n)?n:null;}
   function toDateString(value){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
