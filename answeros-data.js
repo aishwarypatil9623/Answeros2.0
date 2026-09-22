@@ -37,8 +37,10 @@
   }
   function normalizePaper(value){
     const raw=String(value==null?'':value).trim().toUpperCase().replace(/\s+/g,' ');
-    if(/^PSIR\s*(?:PAPER\s*)?1$/.test(raw)||raw==='PSIRPAPER1')return 'PSIR P1';
-    if(/^PSIR\s*(?:PAPER\s*)?2$/.test(raw)||raw==='PSIRPAPER2')return 'PSIR P2';
+    // Canonicalize all common PSIR paper spellings (PSIR P1, PSIR Paper 1,
+    // PSIR-Paper-1, PSIRPAPER1, etc.) so source formatting cannot leak into the UI.
+    if(/^PSIR\s*(?:P\s*|PAPER\s*[-]?\s*)?1$/.test(raw)||raw==='PSIRPAPER1'||raw==='PSIRP1')return 'PSIR P1';
+    if(/^PSIR\s*(?:P\s*|PAPER\s*[-]?\s*)?2$/.test(raw)||raw==='PSIRPAPER2'||raw==='PSIRP2')return 'PSIR P2';
     return raw.replace(/\s+/g,'');
   }
   function toNumber(value){if(value===''||value==null)return null;const n=Number(String(value).replace(/,/g,'').replace('%',''));return Number.isFinite(n)?n:null;}
