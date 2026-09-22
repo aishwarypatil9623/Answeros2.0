@@ -1393,19 +1393,19 @@ const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" style="width:au
 const tierBreakdown = TIERS.map(t=> ({t, n: weakestPaperRows.filter(a=>a.tier.key===t.key).length})).filter(x=>x.n>0);
 
 document.getElementById('focusArea').innerHTML = `
-  <div class="focus-headline">${weakestPaper[0]} ${trendHtml}<span>· ${weakestPaper[1].toFixed(0)}% avg</span></div>
+  <div class="focus-headline">${subjectLabel(weakestPaper[0])} ${trendHtml}<span>· ${weakestPaper[1].toFixed(0)}% avg</span></div>
   <div class="focus-sub">Your lowest-scoring paper, across ${weakestPaperCount} answers.</div>
   <div class="focus-tier-chips">${tierBreakdown.map(x=>`<div class="focus-tier-chip"><img src="${x.t.img}" alt="${x.t.label}">${x.n} ${x.t.label}</div>`).join('')}</div>
   ${weakSubtopicEntry ? `
   <div class="focus-topic-row" id="focusTopicRow">
     <div style="flex:1;min-width:0;">
       <div class="focus-topic-name">${weakSubtopicEntry.name}</div>
-      <div class="focus-topic-meta">${weakSubtopicEntry.paper} · ${weakSubtopicEntry.rows.length} attempts · weakest specific theme</div>
+      <div class="focus-topic-meta">${subjectLabel(weakSubtopicEntry.paper)} · ${weakSubtopicEntry.rows.length} attempts · weakest specific theme</div>
     </div>
     <div class="cc-score sm" style="background:#fbf1ee;color:#b3402c;font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px;">${weakSubtopicEntry.avg.toFixed(0)}%</div>
   </div>` : ''}
   <div class="focus-note">🔁 Recurring gap: <b>${topGap[0]}</b> flagged in ${topGap[1]} of ${totalAnswers} answers (${topGapPct}%) — this is costing you marks across papers, not just ${weakestPaper[0]}.</div>
-  <div class="focus-secondary">Prioritize ${weakestPaper[0]} revision and deliberately add ${topGap[0].toLowerCase()} to your next 3 answers.</div>
+  <div class="focus-secondary">Prioritize ${subjectLabel(weakestPaper[0])} revision and deliberately add ${topGap[0].toLowerCase()} to your next 3 answers.</div>
 `;
 document.getElementById('focusArea').querySelector('.focus-headline').style.cursor = 'pointer';
 document.getElementById('focusArea').querySelector('.focus-headline').addEventListener('click', ()=> jumpToSubject(weakestPaper[0]));
