@@ -93,6 +93,7 @@
       date,
       paper:normalizePaper(row.Paper),
       subject:String(row.Subject||'').trim(),
+      source:String(row['Question Source']||'').trim().toUpperCase(),
       subtopic:String(row.Subtopic||'').trim(),
       directive:String(row.Directive||'').trim(),
       marks,
