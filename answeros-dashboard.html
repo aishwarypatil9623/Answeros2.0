@@ -358,6 +358,28 @@
   .dashboard-heatmap-card .heatmap-toggle-btn{border:0;background:transparent;color:var(--ink-500);border-radius:5px;padding:4px 8px;font:700 10px/1.1 inherit;cursor:pointer;min-width:28px;}
   .dashboard-heatmap-card .heatmap-toggle-btn.active{background:#fff;color:var(--green-800);box-shadow:0 1px 2px rgba(0,0,0,.08);}
   .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
+  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:stretch;}
+  .dashboard-heatmap-card .heatmap-main{min-width:0;}
+  .dashboard-heatmap-card .heatmap-legend{margin-top:10px;padding-top:9px;gap:5px;}
+  .dashboard-heatmap-card .heatmap-legend .sw{width:11px;height:11px;border-radius:3px;}
+  .dashboard-heatmap-card .heatmap-day-detail{min-height:122px;margin:0;padding:12px;background:var(--green-50);border:1px solid var(--line);border-radius:9px;display:flex;flex-direction:column;justify-content:center;}
+  .dashboard-heatmap-card .heatmap-empty-title{font-size:12px;font-weight:800;color:var(--ink-800);margin-bottom:5px;}
+  .dashboard-heatmap-card .heatmap-empty-text{font-size:10.5px;line-height:1.5;color:var(--ink-500);}
+  .dashboard-heatmap-card .heatmap-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
+  .dashboard-heatmap-card .heatmap-detail-date{font-size:11px;font-weight:800;color:var(--ink-900);}
+  .dashboard-heatmap-card .heatmap-detail-count{font-size:10px;font-weight:800;color:var(--green-800);white-space:nowrap;}
+  .dashboard-heatmap-card .heatmap-detail-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:7px;font-size:10px;color:var(--ink-600);}
+  .dashboard-heatmap-card .heatmap-detail-stats b{color:var(--ink-800);}
+  .dashboard-heatmap-card .heatmap-detail-list{display:flex;flex-direction:column;gap:4px;}
+  .dashboard-heatmap-card .heatmap-detail-row{display:flex;align-items:center;gap:7px;min-width:0;font-size:10px;}
+  .dashboard-heatmap-card .heatmap-detail-tag{font-size:8.5px;font-weight:800;padding:2px 5px;border-radius:4px;flex:0 0 auto;}
+  .dashboard-heatmap-card .heatmap-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-700);}
+  .dashboard-heatmap-card .heatmap-detail-score{font-weight:800;color:var(--ink-900);}
+  .dashboard-heatmap-card .heatmap-cell.cal-4{background:#155c2a;color:#fff;}
+  @media(max-width:900px){
+    .dashboard-heatmap-card .heatmap-layout{grid-template-columns:1fr;}
+    .dashboard-heatmap-card .heatmap-day-detail{min-height:90px;}
+  }
   .dashboard-heatmap-card .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
   .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:14px;margin-left:26px;margin-bottom:4px;font-size:10px;color:var(--ink-500);min-width:max-content;}
   .dashboard-heatmap-card .heatmap-months span{position:absolute;white-space:nowrap;}
@@ -370,17 +392,7 @@
   .dashboard-heatmap-card .heatmap-cell[data-date]{cursor:pointer;}
   .dashboard-heatmap-card .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
   .dashboard-heatmap-card .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
-  .dashboard-heatmap-card .heatmap-day-detail{margin-top:10px;padding:10px 12px;background:var(--green-50);border:1px solid var(--line);border-radius:8px;}
-  .dashboard-heatmap-card .heatmap-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
-  .dashboard-heatmap-card .heatmap-detail-date{font-size:11px;font-weight:800;color:var(--ink-900);}
-  .dashboard-heatmap-card .heatmap-detail-count{font-size:10px;font-weight:800;color:var(--green-800);white-space:nowrap;}
-  .dashboard-heatmap-card .heatmap-detail-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:7px;font-size:10px;color:var(--ink-600);}
-  .dashboard-heatmap-card .heatmap-detail-stats b{color:var(--ink-800);}
-  .dashboard-heatmap-card .heatmap-detail-list{display:flex;flex-direction:column;gap:4px;}
-  .dashboard-heatmap-card .heatmap-detail-row{display:flex;align-items:center;gap:7px;min-width:0;font-size:10px;}
-  .dashboard-heatmap-card .heatmap-detail-tag{font-size:8.5px;font-weight:800;padding:2px 5px;border-radius:4px;flex:0 0 auto;}
-  .dashboard-heatmap-card .heatmap-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-700);}
-  .dashboard-heatmap-card .heatmap-detail-score{font-weight:800;color:var(--ink-900);}
+
 
   .status-chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;}
   ::-webkit-scrollbar{width:8px;height:8px;}
@@ -557,23 +569,31 @@
           <button type="button" class="heatmap-toggle-btn" id="heatmap12Btn">12M</button>
         </div>
       </div>
-      <div class="heatmap-scroll">
-        <div class="heatmap-months" id="heatmapMonths"></div>
-        <div class="heatmap-body">
-          <div class="heatmap-daylabels">
-            <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+      <div class="heatmap-layout">
+        <div class="heatmap-main">
+          <div class="heatmap-scroll">
+            <div class="heatmap-months" id="heatmapMonths"></div>
+            <div class="heatmap-body">
+              <div class="heatmap-daylabels">
+                <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+              </div>
+              <div class="heatmap-grid" id="heatmapGrid"></div>
+            </div>
           </div>
-          <div class="heatmap-grid" id="heatmapGrid"></div>
+          <div class="cal-legend heatmap-legend">
+            <span style="font-size:10px;color:var(--ink-500);margin-right:2px;">Less</span>
+            <span class="sw" style="background:#eef1ee;"></span>
+            <span class="sw" style="background:#cdeada;"></span>
+            <span class="sw" style="background:#7cc298;"></span>
+            <span class="sw" style="background:var(--green-700);"></span>
+            <span class="sw" style="background:#155c2a;"></span>
+            <span style="font-size:10px;color:var(--ink-500);margin-left:2px;">More</span>
+          </div>
         </div>
-      </div>
-      <div class="heatmap-day-detail" id="heatmapDayDetail" style="display:none;"></div>
-      <div class="cal-legend" style="margin-top:8px;gap:4px;padding-top:8px;">
-        <span style="font-size:10px;color:var(--ink-500);margin-right:2px;">Less</span>
-        <span class="sw" style="background:#eef1ee;"></span>
-        <span class="sw" style="background:#cdeada;"></span>
-        <span class="sw" style="background:#7cc298;"></span>
-        <span class="sw" style="background:var(--green-700);"></span>
-        <span style="font-size:10px;color:var(--ink-500);margin-left:2px;">More</span>
+        <aside class="heatmap-day-detail" id="heatmapDayDetail">
+          <div class="heatmap-empty-title">Daily activity</div>
+          <div class="heatmap-empty-text">Click any day to inspect the answers you wrote, scores and subjects.</div>
+        </aside>
       </div>
     </section>
 
