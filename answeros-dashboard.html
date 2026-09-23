@@ -352,6 +352,25 @@
   .strip-item .si-label{font-size:10.5px;color:var(--ink-500);}
   .strip-item .si-delta{font-size:10px;color:var(--green-700);font-weight:600;margin-top:1px;}
 
+
+  /* 6-month Answer Activity heatmap */
+  .dashboard-heatmap-card .heatmap-periods{display:flex;gap:5px;flex-wrap:wrap;}
+  .dashboard-heatmap-card .heatmap-period-btn{border:1px solid var(--line);background:#fff;color:var(--ink-500);border-radius:6px;padding:5px 8px;font:600 10px/1.2 inherit;cursor:pointer;}
+  .dashboard-heatmap-card .heatmap-period-btn.active{background:var(--green-100);border-color:var(--green-700);color:var(--green-800);}
+  .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
+  .dashboard-heatmap-card .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
+  .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:14px;margin-left:26px;margin-bottom:4px;font-size:10px;color:var(--ink-500);min-width:560px;}
+  .dashboard-heatmap-card .heatmap-months span{position:absolute;white-space:nowrap;}
+  .dashboard-heatmap-card .heatmap-body{display:flex;gap:4px;}
+  .dashboard-heatmap-card .heatmap-daylabels{display:flex;flex-direction:column;gap:2.5px;font-size:9px;color:var(--ink-500);width:22px;flex-shrink:0;padding-top:1px;}
+  .dashboard-heatmap-card .heatmap-daylabels span{height:10px;line-height:10px;}
+  .dashboard-heatmap-card .heatmap-grid{display:flex;gap:2.5px;min-width:max-content;}
+  .dashboard-heatmap-card .heatmap-week{display:flex;flex-direction:column;gap:2.5px;flex:0 0 10px;}
+  .dashboard-heatmap-card .heatmap-cell{width:10px;height:10px;flex:0 0 10px;border-radius:2px;position:relative;}
+  .dashboard-heatmap-card .heatmap-cell[data-date]{cursor:pointer;}
+  .dashboard-heatmap-card .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
+  .dashboard-heatmap-card .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
+
   .status-chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;}
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:#d7dcd8;border-radius:8px;}
