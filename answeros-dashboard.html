@@ -358,7 +358,7 @@
   .dashboard-heatmap-card .heatmap-toggle-btn{border:0;background:transparent;color:var(--ink-500);border-radius:5px;padding:4px 8px;font:700 10px/1.1 inherit;cursor:pointer;min-width:28px;}
   .dashboard-heatmap-card .heatmap-toggle-btn.active{background:#fff;color:var(--green-800);box-shadow:0 1px 2px rgba(0,0,0,.08);}
   .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
-  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:stretch;}
+  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(560px,1fr) minmax(420px,1fr);gap:16px;align-items:stretch;}
   .dashboard-heatmap-card .heatmap-main{min-width:0;}
   .dashboard-heatmap-card .heatmap-legend{margin-top:10px;padding-top:9px;gap:5px;}
   .dashboard-heatmap-card .heatmap-legend .sw{width:11px;height:11px;border-radius:3px;}
@@ -381,16 +381,14 @@
     .dashboard-heatmap-card .heatmap-day-detail{min-height:90px;}
   }
   .dashboard-heatmap-card .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
-  .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:16px;margin-left:26px;margin-bottom:5px;font-size:10px;color:var(--ink-500);width:100%;min-width:0;}
+  .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:14px;margin-left:26px;margin-bottom:4px;font-size:10px;color:var(--ink-500);min-width:max-content;}
   .dashboard-heatmap-card .heatmap-months span{position:absolute;white-space:nowrap;}
-  .dashboard-heatmap-card .heatmap-body{display:flex;gap:6px;align-items:flex-start;width:100%;}
-  .dashboard-heatmap-card .heatmap-daylabels{display:flex;flex-direction:column;gap:4px;font-size:9px;color:var(--ink-500);width:22px;flex:0 0 22px;padding-top:1px;}
-  .dashboard-heatmap-card .heatmap-daylabels span{height:14px;line-height:14px;}
-  .dashboard-heatmap-card .heatmap-grid{display:flex;gap:3px;flex:1;min-width:0;width:100%;}
-  .dashboard-heatmap-card .heatmap-week{display:flex;flex-direction:column;gap:4px;flex:1 1 0;min-width:0;}
-  .dashboard-heatmap-card .heatmap-cell{width:100%;height:14px;flex:1 1 auto;min-width:7px;max-width:20px;border-radius:3px;position:relative;}
-  .dashboard-heatmap-card .heatmap-week .heatmap-cell{align-self:center;}
-  .dashboard-heatmap-card .heatmap-grid{justify-content:space-between;}
+  .dashboard-heatmap-card .heatmap-body{display:flex;gap:4px;align-items:flex-start;}
+  .dashboard-heatmap-card .heatmap-daylabels{display:flex;flex-direction:column;gap:3px;font-size:9px;color:var(--ink-500);width:22px;flex-shrink:0;padding-top:1px;}
+  .dashboard-heatmap-card .heatmap-daylabels span{height:12px;line-height:12px;}
+  .dashboard-heatmap-card .heatmap-grid{display:flex;gap:3px;min-width:max-content;}
+  .dashboard-heatmap-card .heatmap-week{display:flex;flex-direction:column;gap:3px;flex:0 0 16px;}
+  .dashboard-heatmap-card .heatmap-cell{width:16px;height:12px;flex:0 0 16px;border-radius:2px;position:relative;}
   .dashboard-heatmap-card .heatmap-cell[data-date]{cursor:pointer;}
   .dashboard-heatmap-card .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
   .dashboard-heatmap-card .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
@@ -1239,18 +1237,15 @@ function heatmapRangeDates(){
 function heatmapMonthLabel(d){
   return d.toLocaleDateString('en-GB',{month:'short'});
 }
+let heatmapSelectedDate = heatmapDateKey(AnswerOSData.today());
+
 function renderHeatmapDayDetail(){
   const box=document.getElementById('heatmapDayDetail');
   if(!box) return;
 
-  if(!raDateFilter){
-    box.style.display='none';
-    box.innerHTML='';
-    return;
-  }
-
-  const rows=ANSWERS.filter(a=>a.date===raDateFilter);
-  const dateLabel=new Date(raDateFilter).toLocaleDateString('en-GB',{
+  const selectedDate = heatmapSelectedDate || heatmapDateKey(AnswerOSData.today());
+  const rows=ANSWERS.filter(a=>a.date===selectedDate);
+  const dateLabel=new Date(selectedDate).toLocaleDateString('en-GB',{
     weekday:'long',day:'numeric',month:'long',year:'numeric'
   });
 
@@ -1339,7 +1334,7 @@ function renderAnswerActivityHeatmap(){
       ${column.map(cell=>{
         if(!cell.inPeriod)return '<span class="heatmap-cell" aria-hidden="true" style="background:transparent;"></span>';
         const level=cell.count===0?0:cell.count===1?1:cell.count<=3?2:cell.count<=5?3:4;
-        const selected=raDateFilter===cell.key?' selected':'';
+        const selected=heatmapSelectedDate===cell.key?' selected':'';
         const title=`${new Date(cell.key).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})} · ${cell.count} answer${cell.count===1?'':'s'}`;
         return `<span class="heatmap-cell cal-${level}${selected}" data-date="${cell.key}" title="${title}" aria-label="${title}"></span>`;
       }).join('')}
@@ -1353,7 +1348,8 @@ function renderAnswerActivityHeatmap(){
 
   grid.querySelectorAll('.heatmap-cell[data-date]').forEach(cell=>{
     cell.addEventListener('click',()=>{
-      raDateFilter=raDateFilter===cell.dataset.date?null:cell.dataset.date;
+      heatmapSelectedDate=cell.dataset.date;
+      raDateFilter=cell.dataset.date;
       renderAnswerActivityHeatmap();
       renderHeatmapDayDetail();
       renderRecent();
