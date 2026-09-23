@@ -370,6 +370,17 @@
   .dashboard-heatmap-card .heatmap-cell[data-date]{cursor:pointer;}
   .dashboard-heatmap-card .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
   .dashboard-heatmap-card .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
+  .dashboard-heatmap-card .heatmap-day-detail{margin-top:10px;padding:10px 12px;background:var(--green-50);border:1px solid var(--line);border-radius:8px;}
+  .dashboard-heatmap-card .heatmap-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
+  .dashboard-heatmap-card .heatmap-detail-date{font-size:11px;font-weight:800;color:var(--ink-900);}
+  .dashboard-heatmap-card .heatmap-detail-count{font-size:10px;font-weight:800;color:var(--green-800);white-space:nowrap;}
+  .dashboard-heatmap-card .heatmap-detail-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:7px;font-size:10px;color:var(--ink-600);}
+  .dashboard-heatmap-card .heatmap-detail-stats b{color:var(--ink-800);}
+  .dashboard-heatmap-card .heatmap-detail-list{display:flex;flex-direction:column;gap:4px;}
+  .dashboard-heatmap-card .heatmap-detail-row{display:flex;align-items:center;gap:7px;min-width:0;font-size:10px;}
+  .dashboard-heatmap-card .heatmap-detail-tag{font-size:8.5px;font-weight:800;padding:2px 5px;border-radius:4px;flex:0 0 auto;}
+  .dashboard-heatmap-card .heatmap-detail-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-700);}
+  .dashboard-heatmap-card .heatmap-detail-score{font-weight:800;color:var(--ink-900);}
 
   .status-chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;}
   ::-webkit-scrollbar{width:8px;height:8px;}
@@ -555,6 +566,7 @@
           <div class="heatmap-grid" id="heatmapGrid"></div>
         </div>
       </div>
+      <div class="heatmap-day-detail" id="heatmapDayDetail" style="display:none;"></div>
       <div class="cal-legend" style="margin-top:8px;gap:4px;padding-top:8px;">
         <span style="font-size:10px;color:var(--ink-500);margin-right:2px;">Less</span>
         <span class="sw" style="background:#eef1ee;"></span>
@@ -1205,6 +1217,55 @@ function heatmapRangeDates(){
 function heatmapMonthLabel(d){
   return d.toLocaleDateString('en-GB',{month:'short'});
 }
+function renderHeatmapDayDetail(){
+  const box=document.getElementById('heatmapDayDetail');
+  if(!box) return;
+
+  if(!raDateFilter){
+    box.style.display='none';
+    box.innerHTML='';
+    return;
+  }
+
+  const rows=ANSWERS.filter(a=>a.date===raDateFilter);
+  const dateLabel=new Date(raDateFilter).toLocaleDateString('en-GB',{
+    weekday:'long',day:'numeric',month:'long',year:'numeric'
+  });
+
+  const avg=rows.length
+    ? Math.round(rows.reduce((sum,a)=>sum+(a.marks/a.max*100),0)/rows.length)
+    : 0;
+
+  const subjects=[...new Set(rows.map(a=>subjectLabel(a.paper)))];
+  const subjectText=subjects.length ? subjects.join(', ') : 'No answers';
+
+  box.style.display='block';
+  box.innerHTML=`
+    <div class="heatmap-detail-head">
+      <div class="heatmap-detail-date">${dateLabel}</div>
+      <div class="heatmap-detail-count">${rows.length} answer${rows.length===1?'':'s'}</div>
+    </div>
+    <div class="heatmap-detail-stats">
+      <span>Average: <b>${rows.length ? avg+'%' : '—'}</b></span>
+      <span>Subjects: <b>${subjectText}</b></span>
+    </div>
+    ${rows.length ? `
+      <div class="heatmap-detail-list">
+        ${rows.map(a=>{
+          const col=SUBJECT_COLORS[a.paper]||'#888';
+          const score=Math.round(a.marks/a.max*100);
+          return `
+            <div class="heatmap-detail-row">
+              <span class="heatmap-detail-tag" style="background:${col}1a;color:${col};">${subjectLabel(a.paper)}</span>
+              <span class="heatmap-detail-title">${a.subtopic}</span>
+              <span class="heatmap-detail-score">${score}%</span>
+            </div>`;
+        }).join('')}
+      </div>`
+      : '<div style="font-size:10px;color:var(--ink-500);">No answers were logged on this day.</div>'}
+  `;
+}
+
 function renderAnswerActivityHeatmap(){
   const grid=document.getElementById('heatmapGrid');
   const months=document.getElementById('heatmapMonths');
@@ -1272,6 +1333,7 @@ function renderAnswerActivityHeatmap(){
     cell.addEventListener('click',()=>{
       raDateFilter=raDateFilter===cell.dataset.date?null:cell.dataset.date;
       renderAnswerActivityHeatmap();
+      renderHeatmapDayDetail();
       renderRecent();
       renderCalendar();
       renderCalDayDetail();
@@ -1280,6 +1342,7 @@ function renderAnswerActivityHeatmap(){
 }
 
 renderAnswerActivityHeatmap();
+renderHeatmapDayDetail();
 document.getElementById('heatmap6Btn').addEventListener('click',()=>{
   heatmapRange=6;
   localStorage.setItem(HEATMAP_RANGE_KEY,'6');
