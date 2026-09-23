@@ -698,9 +698,27 @@ document.getElementById('darkToggle').addEventListener('click', function(){
    Max Marks, Status ... etc.
    Replace this array with real rows pasted from the sheet.
 ============================================================ */
-const ANSWERS = AnswerOSData.getAnswers();
+const ALL_ANSWERS = AnswerOSData.getAnswers();
+
+const DASHBOARD_SOURCE_KEY = 'answeros_dashboard_source_v1';
+const dashboardSourceFilter = document.getElementById('dashboardSourceFilter');
+const savedDashboardSource = localStorage.getItem(DASHBOARD_SOURCE_KEY) || 'all';
+if(dashboardSourceFilter){
+  dashboardSourceFilter.value = savedDashboardSource;
+}
+
+const ANSWERS = savedDashboardSource === 'all'
+  ? ALL_ANSWERS
+  : ALL_ANSWERS.filter(a => String(a.source || '').trim().toUpperCase() === savedDashboardSource);
 
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
+
+if(dashboardSourceFilter){
+  dashboardSourceFilter.addEventListener('change', ()=>{
+    localStorage.setItem(DASHBOARD_SOURCE_KEY, dashboardSourceFilter.value);
+    window.location.reload();
+  });
+}
 const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', ['PSIR P1']:'#0f766e', ['PSIR P2']:'#0891b2'};
 const SUBJECT_LABELS = {};
 const subjectLabel = s => s;
