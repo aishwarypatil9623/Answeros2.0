@@ -514,6 +514,38 @@
       </section>
     </div>
 
+
+    <!-- Row: 6-Month Answer Activity Heatmap -->
+    <section class="card dashboard-heatmap-card" id="answerActivityHeatmap" style="margin-bottom:16px;">
+      <div class="card-head">
+        <div>
+          <h3 style="font-size:14px;margin:0;">Answer Activity</h3>
+          <div class="heatmap-subtitle" id="heatmapSubtitle">Last 6 months</div>
+        </div>
+        <div class="heatmap-periods" role="group" aria-label="Heatmap period">
+          <button type="button" class="heatmap-period-btn active" id="heatmapCurrentBtn">Current 6 Months</button>
+          <button type="button" class="heatmap-period-btn" id="heatmapPreviousBtn">Previous 6 Months</button>
+        </div>
+      </div>
+      <div class="heatmap-scroll">
+        <div class="heatmap-months" id="heatmapMonths"></div>
+        <div class="heatmap-body">
+          <div class="heatmap-daylabels">
+            <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+          </div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+        </div>
+      </div>
+      <div class="cal-legend" style="margin-top:8px;gap:4px;padding-top:8px;">
+        <span style="font-size:10px;color:var(--ink-500);margin-right:2px;">Less</span>
+        <span class="sw" style="background:#eef1ee;"></span>
+        <span class="sw" style="background:#cdeada;"></span>
+        <span class="sw" style="background:#7cc298;"></span>
+        <span class="sw" style="background:var(--green-700);"></span>
+        <span style="font-size:10px;color:var(--ink-500);margin-left:2px;">More</span>
+      </div>
+    </section>
+
     <!-- Row: Calendar / Score Improvement / Top Performance -->
     <div class="grid3" id="dashRow2">
       <section class="card">
@@ -1135,6 +1167,111 @@ raSubjSelect.addEventListener('change', renderRecent);
 document.getElementById('raSort').addEventListener('change', renderRecent);
 document.getElementById('raLimit').addEventListener('change', renderRecent);
 document.getElementById('raDateChipClear').addEventListener('click', ()=>{ raDateFilter=null; raTierFilter=null; renderRecent(); renderCalendar(); renderCalDayDetail(); renderQuickStats(); });
+
+
+/* ---------- 6-month answer activity heatmap ---------- */
+const HEATMAP_PERIOD_KEY = 'answeros_heatmap_period_v1';
+let heatmapPeriod = localStorage.getItem(HEATMAP_PERIOD_KEY) === 'previous' ? 'previous' : 'current';
+
+function heatmapDateKey(d){
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+}
+function heatmapPeriodDates(period){
+  const today = AnswerOSData.today();
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let start, periodEnd;
+  if(period === 'previous'){
+    periodEnd = new Date(end.getFullYear(), end.getMonth()-6, end.getDate());
+    start = new Date(end.getFullYear(), end.getMonth()-12, end.getDate()+1);
+  }else{
+    periodEnd = end;
+    start = new Date(end.getFullYear(), end.getMonth()-6, end.getDate()+1);
+  }
+  return {start, end:periodEnd};
+}
+function heatmapMonthLabel(d){
+  return d.toLocaleDateString('en-GB',{month:'short'});
+}
+function renderAnswerActivityHeatmap(){
+  const grid = document.getElementById('heatmapGrid');
+  const months = document.getElementById('heatmapMonths');
+  const subtitle = document.getElementById('heatmapSubtitle');
+  if(!grid || !months) return;
+
+  const {start, end} = heatmapPeriodDates(heatmapPeriod);
+  const startGrid = new Date(start);
+  startGrid.setDate(startGrid.getDate() - startGrid.getDay()); // Sunday
+  const endGrid = new Date(end);
+  endGrid.setDate(endGrid.getDate() + (6 - endGrid.getDay())); // Saturday
+
+  const countByDate = {};
+  ANSWERS.forEach(a=>{
+    const d = String(a.date || '').slice(0,10);
+    if(d) countByDate[d] = (countByDate[d] || 0) + 1;
+  });
+
+  const columns = [];
+  const monthPositions = [];
+  let cursor = new Date(startGrid);
+  let lastMonthKey = '';
+  while(cursor <= endGrid){
+    const column = [];
+    for(let row=0; row<7; row++){
+      const d = new Date(cursor);
+      d.setDate(cursor.getDate()+row);
+      const key = heatmapDateKey(d);
+      const inPeriod = d >= start && d <= end;
+      const count = inPeriod ? (countByDate[key] || 0) : 0;
+      column.push({date:d,key,count,inPeriod});
+    }
+    columns.push(column);
+
+    const monthKey = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+    if(monthKey !== lastMonthKey){
+      monthPositions.push({key:monthKey,label:heatmapMonthLabel(cursor),column:columns.length-1});
+      lastMonthKey = monthKey;
+    }
+    cursor.setDate(cursor.getDate()+7);
+  }
+
+  months.innerHTML = monthPositions.map(m=>`<span style="left:${m.column*12.5}px;">${m.label}</span>`).join('');
+  grid.innerHTML = columns.map(column=>column.map(cell=>{
+    if(!cell.inPeriod) return '<span class="heatmap-cell" aria-hidden="true" style="background:transparent;"></span>';
+    const level = cell.count===0 ? 0 : cell.count===1 ? 1 : cell.count<=3 ? 2 : cell.count<=5 ? 3 : 4;
+    const selected = raDateFilter === cell.key ? ' selected' : '';
+    const title = `${new Date(cell.key).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})} · ${cell.count} answer${cell.count===1?'':'s'}`;
+    return `<span class="heatmap-cell cal-${level}${selected}" data-date="${cell.key}" title="${title}" aria-label="${title}"></span>`;
+  }).join('')).join('');
+
+  const fmt = d=>d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  subtitle.textContent = `${fmt(start)} – ${fmt(end)}`;
+
+  document.getElementById('heatmapCurrentBtn').classList.toggle('active', heatmapPeriod==='current');
+  document.getElementById('heatmapPreviousBtn').classList.toggle('active', heatmapPeriod==='previous');
+
+  grid.querySelectorAll('.heatmap-cell[data-date]').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      raDateFilter = raDateFilter === cell.dataset.date ? null : cell.dataset.date;
+      renderAnswerActivityHeatmap();
+      renderRecent();
+      renderCalendar();
+      renderCalDayDetail();
+    });
+  });
+}
+
+renderAnswerActivityHeatmap();
+document.getElementById('heatmapCurrentBtn').addEventListener('click', ()=>{
+  heatmapPeriod = 'current';
+  localStorage.setItem(HEATMAP_PERIOD_KEY, heatmapPeriod);
+  renderAnswerActivityHeatmap();
+});
+document.getElementById('heatmapPreviousBtn').addEventListener('click', ()=>{
+  heatmapPeriod = 'previous';
+  localStorage.setItem(HEATMAP_PERIOD_KEY, heatmapPeriod);
+  renderAnswerActivityHeatmap();
+});
 
 /* ---------- consistency calendar (functional month nav) ---------- */
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
