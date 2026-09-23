@@ -354,19 +354,16 @@
 
 
   /* 6-month Answer Activity heatmap */
-  .dashboard-heatmap-card .heatmap-periods{display:flex;gap:5px;flex-wrap:wrap;}
-  .dashboard-heatmap-card .heatmap-period-btn{border:1px solid var(--line);background:#fff;color:var(--ink-500);border-radius:6px;padding:5px 8px;font:600 10px/1.2 inherit;cursor:pointer;}
-  .dashboard-heatmap-card .heatmap-period-btn.active{background:var(--green-100);border-color:var(--green-700);color:var(--green-800);}
   .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
   .dashboard-heatmap-card .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
-  .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:14px;margin-left:26px;margin-bottom:4px;font-size:10px;color:var(--ink-500);min-width:560px;}
+  .dashboard-heatmap-card .heatmap-months{display:flex;position:relative;height:14px;margin-left:26px;margin-bottom:4px;font-size:10px;color:var(--ink-500);min-width:410px;}
   .dashboard-heatmap-card .heatmap-months span{position:absolute;white-space:nowrap;}
-  .dashboard-heatmap-card .heatmap-body{display:flex;gap:4px;}
-  .dashboard-heatmap-card .heatmap-daylabels{display:flex;flex-direction:column;gap:2.5px;font-size:9px;color:var(--ink-500);width:22px;flex-shrink:0;padding-top:1px;}
-  .dashboard-heatmap-card .heatmap-daylabels span{height:10px;line-height:10px;}
-  .dashboard-heatmap-card .heatmap-grid{display:flex;gap:2.5px;min-width:max-content;}
-  .dashboard-heatmap-card .heatmap-week{display:flex;flex-direction:column;gap:2.5px;flex:0 0 10px;}
-  .dashboard-heatmap-card .heatmap-cell{width:10px;height:10px;flex:0 0 10px;border-radius:2px;position:relative;}
+  .dashboard-heatmap-card .heatmap-body{display:flex;gap:4px;align-items:flex-start;}
+  .dashboard-heatmap-card .heatmap-daylabels{display:flex;flex-direction:column;gap:3px;font-size:9px;color:var(--ink-500);width:22px;flex-shrink:0;padding-top:1px;}
+  .dashboard-heatmap-card .heatmap-daylabels span{height:12px;line-height:12px;}
+  .dashboard-heatmap-card .heatmap-grid{display:flex;gap:3px;min-width:max-content;}
+  .dashboard-heatmap-card .heatmap-week{display:flex;flex-direction:column;gap:3px;flex:0 0 12px;}
+  .dashboard-heatmap-card .heatmap-cell{width:12px;height:12px;flex:0 0 12px;border-radius:2px;position:relative;}
   .dashboard-heatmap-card .heatmap-cell[data-date]{cursor:pointer;}
   .dashboard-heatmap-card .heatmap-cell[data-date]:hover{outline:1.5px solid var(--ink-700);outline-offset:0.5px;}
   .dashboard-heatmap-card .heatmap-cell.selected{outline:2px solid var(--green-800);outline-offset:0.5px;}
@@ -540,10 +537,6 @@
         <div>
           <h3 style="font-size:14px;margin:0;">Answer Activity</h3>
           <div class="heatmap-subtitle" id="heatmapSubtitle">Last 6 months</div>
-        </div>
-        <div class="heatmap-periods" role="group" aria-label="Heatmap period">
-          <button type="button" class="heatmap-period-btn active" id="heatmapCurrentBtn">Current 6 Months</button>
-          <button type="button" class="heatmap-period-btn" id="heatmapPreviousBtn">Previous 6 Months</button>
         </div>
       </div>
       <div class="heatmap-scroll">
@@ -1189,25 +1182,15 @@ document.getElementById('raDateChipClear').addEventListener('click', ()=>{ raDat
 
 
 /* ---------- 6-month answer activity heatmap ---------- */
-const HEATMAP_PERIOD_KEY = 'answeros_heatmap_period_v1';
-let heatmapPeriod = localStorage.getItem(HEATMAP_PERIOD_KEY) === 'previous' ? 'previous' : 'current';
-
 function heatmapDateKey(d){
   const x = new Date(d);
   return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
 }
-function heatmapPeriodDates(period){
+function heatmapPeriodDates(){
   const today = AnswerOSData.today();
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  let start, periodEnd;
-  if(period === 'previous'){
-    periodEnd = new Date(end.getFullYear(), end.getMonth()-6, end.getDate());
-    start = new Date(end.getFullYear(), end.getMonth()-12, end.getDate()+1);
-  }else{
-    periodEnd = end;
-    start = new Date(end.getFullYear(), end.getMonth()-6, end.getDate()+1);
-  }
-  return {start, end:periodEnd};
+  const start = new Date(end.getFullYear(), end.getMonth()-6, end.getDate()+1);
+  return {start, end};
 }
 function heatmapMonthLabel(d){
   return d.toLocaleDateString('en-GB',{month:'short'});
@@ -1218,7 +1201,7 @@ function renderAnswerActivityHeatmap(){
   const subtitle = document.getElementById('heatmapSubtitle');
   if(!grid || !months) return;
 
-  const {start, end} = heatmapPeriodDates(heatmapPeriod);
+  const {start, end} = heatmapPeriodDates();
   const startGrid = new Date(start);
   startGrid.setDate(startGrid.getDate() - startGrid.getDay()); // Sunday
   const endGrid = new Date(end);
@@ -1234,6 +1217,7 @@ function renderAnswerActivityHeatmap(){
   const monthPositions = [];
   let cursor = new Date(startGrid);
   let lastMonthKey = '';
+
   while(cursor <= endGrid){
     const column = [];
     for(let row=0; row<7; row++){
@@ -1248,26 +1232,36 @@ function renderAnswerActivityHeatmap(){
 
     const monthKey = `${cursor.getFullYear()}-${cursor.getMonth()}`;
     if(monthKey !== lastMonthKey){
-      monthPositions.push({key:monthKey,label:heatmapMonthLabel(cursor),column:columns.length-1});
+      monthPositions.push({
+        key:monthKey,
+        label:heatmapMonthLabel(cursor),
+        column:columns.length-1
+      });
       lastMonthKey = monthKey;
     }
     cursor.setDate(cursor.getDate()+7);
   }
 
-  months.innerHTML = monthPositions.map(m=>`<span style="left:${m.column*12.5}px;">${m.label}</span>`).join('');
-  grid.innerHTML = columns.map(column=>column.map(cell=>{
-    if(!cell.inPeriod) return '<span class="heatmap-cell" aria-hidden="true" style="background:transparent;"></span>';
-    const level = cell.count===0 ? 0 : cell.count===1 ? 1 : cell.count<=3 ? 2 : cell.count<=5 ? 3 : 4;
-    const selected = raDateFilter === cell.key ? ' selected' : '';
-    const title = `${new Date(cell.key).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})} · ${cell.count} answer${cell.count===1?'':'s'}`;
-    return `<span class="heatmap-cell cal-${level}${selected}" data-date="${cell.key}" title="${title}" aria-label="${title}"></span>`;
-  }).join('')).join('');
+  months.innerHTML = monthPositions
+    .map(m=>`<span style="left:${m.column*15}px;">${m.label}</span>`)
+    .join('');
+
+  grid.innerHTML = columns.map(column=>`
+    <div class="heatmap-week">
+      ${column.map(cell=>{
+        if(!cell.inPeriod){
+          return '<span class="heatmap-cell" aria-hidden="true" style="background:transparent;"></span>';
+        }
+        const level = cell.count===0 ? 0 : cell.count===1 ? 1 : cell.count<=3 ? 2 : cell.count<=5 ? 3 : 4;
+        const selected = raDateFilter === cell.key ? ' selected' : '';
+        const title = `${new Date(cell.key).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})} · ${cell.count} answer${cell.count===1?'':'s'}`;
+        return `<span class="heatmap-cell cal-${level}${selected}" data-date="${cell.key}" title="${title}" aria-label="${title}"></span>`;
+      }).join('')}
+    </div>`
+  ).join('');
 
   const fmt = d=>d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   subtitle.textContent = `${fmt(start)} – ${fmt(end)}`;
-
-  document.getElementById('heatmapCurrentBtn').classList.toggle('active', heatmapPeriod==='current');
-  document.getElementById('heatmapPreviousBtn').classList.toggle('active', heatmapPeriod==='previous');
 
   grid.querySelectorAll('.heatmap-cell[data-date]').forEach(cell=>{
     cell.addEventListener('click', ()=>{
@@ -1281,16 +1275,6 @@ function renderAnswerActivityHeatmap(){
 }
 
 renderAnswerActivityHeatmap();
-document.getElementById('heatmapCurrentBtn').addEventListener('click', ()=>{
-  heatmapPeriod = 'current';
-  localStorage.setItem(HEATMAP_PERIOD_KEY, heatmapPeriod);
-  renderAnswerActivityHeatmap();
-});
-document.getElementById('heatmapPreviousBtn').addEventListener('click', ()=>{
-  heatmapPeriod = 'previous';
-  localStorage.setItem(HEATMAP_PERIOD_KEY, heatmapPeriod);
-  renderAnswerActivityHeatmap();
-});
 
 /* ---------- consistency calendar (functional month nav) ---------- */
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
