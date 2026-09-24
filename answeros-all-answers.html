@@ -551,13 +551,13 @@ function render(){
             </div>
           </div>
           <div class="adetail-resizer" title="Drag to resize"></div>
-          ${a.pdfId ? `
+          ${(extractCheckedCopyId(a['Checked Copy'] || a['Checked Copy Link'] || a['Checked Copy PDF'] || a['Checked Copy ID']) || a.pdfId) ? `
           <div class="adetail-pdf">
             <div class="adetail-pdf-head">
-              <span>Answer PDF</span>
-              <a href="https://drive.google.com/file/d/${a.pdfId}/view" target="_blank" rel="noopener">Open full ↗</a>
+              <span>${extractCheckedCopyId(a['Checked Copy'] || a['Checked Copy Link'] || a['Checked Copy PDF'] || a['Checked Copy ID']) ? 'Checked Answer Copy' : 'Answer PDF'}</span>
+              <a href="https://drive.google.com/file/d/${extractCheckedCopyId(a['Checked Copy'] || a['Checked Copy Link'] || a['Checked Copy PDF'] || a['Checked Copy ID']) || a.pdfId}/view" target="_blank" rel="noopener">Open full ↗</a>
             </div>
-            <iframe src="https://drive.google.com/file/d/${a.pdfId}/preview" loading="lazy" allow="autoplay"></iframe>
+            <iframe src="https://drive.google.com/file/d/${extractCheckedCopyId(a['Checked Copy'] || a['Checked Copy Link'] || a['Checked Copy PDF'] || a['Checked Copy ID']) || a.pdfId}/preview" loading="lazy" allow="autoplay"></iframe>
           </div>` : `
           <div class="adetail-pdf">
             <div class="adetail-pdf-head"><span>Answer PDF</span></div>
@@ -595,6 +595,20 @@ function render(){
       render();
     });
   });
+}
+
+function extractCheckedCopyId(value){
+  const text=String(value==null?'':value).trim();
+  if(!text)return '';
+  const source=text.replace(/^=HYPERLINK\\s*\\(\\s*"([^"]+)".*$/i,'$1');
+  const patterns=[
+    /drive\\.google\\.com\\/file\\/d\\/([a-zA-Z0-9_-]+)/i,
+    /drive\\.google\\.com\\/open\\?[^\\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+    /drive\\.google\\.com\\/uc\\?[^\\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+    /[?&]id=([a-zA-Z0-9_-]+)/i
+  ];
+  for(const pattern of patterns){const match=source.match(pattern);if(match)return match[1];}
+  return /^[a-zA-Z0-9_-]{20,}$/.test(source)?source:'';
 }
 
 function formatDash(text){
