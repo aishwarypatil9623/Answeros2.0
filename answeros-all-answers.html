@@ -559,7 +559,6 @@ function render(){
             </div>
             <iframe src="https://drive.google.com/file/d/${getCheckedCopyId(a) || a.pdfId}/preview" loading="lazy" allow="autoplay"></iframe>
           </div>` : `
-          </div>` : `
           <div class="adetail-pdf">
             <div class="adetail-pdf-head"><span>Answer PDF</span></div>
             <div class="adetail-pdf-empty">
@@ -599,19 +598,19 @@ function render(){
 }
 
 function getCheckedCopyId(answer){
-  try{
-    const value=String(answer&&answer['Checked Copy']||'').trim();
-    const match=value.match(/[A-Za-z0-9_-]{20,}/);
-    return match?match[0]:'';
-  }catch(_){return '';}
+  const value=String(answer&&answer['Checked Copy']||answer&&answer['Checked Copy Link']||answer&&answer['Checked Copy PDF']||answer&&answer['Checked Copy ID']||'').trim();
+  if(!value)return '';
+  const source=value.replace(/^=HYPERLINK\s*\(\s*"([^"]+)".*$/i,'$1');
+  const patterns=[
+    /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i,
+    /drive\.google\.com\/open\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+    /drive\.google\.com\/uc\?[^\s]*[?&]id=([a-zA-Z0-9_-]+)/i,
+    /[?&]id=([a-zA-Z0-9_-]+)/i
+  ];
+  for(const pattern of patterns){const match=source.match(pattern);if(match)return match[1];}
+  return /^[a-zA-Z0-9_-]{20,}$/.test(source)?source:'';
 }
 
-function formatDash(text){
-  // splits "Title — description" into bold title + rest
-  const idx = text.indexOf('—');
-  if(idx===-1) return text;
-  return `<b>${text.slice(0,idx).trim()}</b> — ${text.slice(idx+1).trim()}`;
-}
 
 render();
 if(deepLinkId){
