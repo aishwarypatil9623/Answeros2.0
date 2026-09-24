@@ -597,6 +597,13 @@ function render(){
   });
 }
 
+function formatDash(text){
+  // splits "Title — description" into bold title + rest
+  const idx = text.indexOf('—');
+  if(idx===-1) return text;
+  return `<b>${text.slice(0,idx).trim()}</b> — ${text.slice(idx+1).trim()}`;
+}
+
 function getCheckedCopyId(answer){
   const value=String(answer&&answer['Checked Copy']||answer&&answer['Checked Copy Link']||answer&&answer['Checked Copy PDF']||answer&&answer['Checked Copy ID']||'').trim();
   if(!value)return '';
