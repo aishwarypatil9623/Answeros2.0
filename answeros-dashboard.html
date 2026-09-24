@@ -354,11 +354,15 @@
 
 
   /* Answer Activity heatmap */
+  .dashboard-heatmap-card .heatmap-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+  .dashboard-heatmap-card .heatmap-view-control{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);background:var(--card);border-radius:7px;}
+  .dashboard-heatmap-card .heatmap-view-label{font-size:9px;font-weight:800;color:var(--ink-500);text-transform:uppercase;letter-spacing:.04em;}
+  .dashboard-heatmap-card .heatmap-split-slider{width:105px;height:14px;accent-color:var(--green-700);cursor:pointer;}
   .dashboard-heatmap-card .heatmap-toggle{display:inline-flex;align-items:center;padding:2px;background:var(--ink-100);border:1px solid var(--line);border-radius:7px;gap:2px;}
   .dashboard-heatmap-card .heatmap-toggle-btn{border:0;background:transparent;color:var(--ink-500);border-radius:5px;padding:4px 8px;font:700 10px/1.1 inherit;cursor:pointer;min-width:28px;}
   .dashboard-heatmap-card .heatmap-toggle-btn.active{background:#fff;color:var(--green-800);box-shadow:0 1px 2px rgba(0,0,0,.08);}
   .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
-  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(560px,1fr) minmax(420px,1fr);gap:16px;align-items:stretch;}
+  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(560px,1fr) minmax(320px,var(--heatmap-detail-width,460px));gap:16px;align-items:stretch;}
   .dashboard-heatmap-card .heatmap-main{min-width:0;}
   .dashboard-heatmap-card .heatmap-legend{margin-top:10px;padding-top:9px;gap:5px;}
   .dashboard-heatmap-card .heatmap-legend .sw{width:11px;height:11px;border-radius:3px;}
@@ -564,9 +568,15 @@
           <h3 style="font-size:14px;margin:0;">Answer Activity</h3>
           <div class="heatmap-subtitle" id="heatmapSubtitle">Last 6 months</div>
         </div>
-        <div class="heatmap-toggle" role="group" aria-label="Heatmap range">
-          <button type="button" class="heatmap-toggle-btn active" id="heatmap6Btn">6M</button>
-          <button type="button" class="heatmap-toggle-btn" id="heatmap12Btn">12M</button>
+        <div class="heatmap-controls">
+          <div class="heatmap-view-control">
+            <span class="heatmap-view-label">Details</span>
+            <input id="heatmapSplitSlider" class="heatmap-split-slider" type="range" min="320" max="620" step="10" value="460" aria-label="Adjust details panel width" title="Adjust details panel width">
+          </div>
+          <div class="heatmap-toggle" role="group" aria-label="Heatmap range">
+            <button type="button" class="heatmap-toggle-btn active" id="heatmap6Btn">6M</button>
+            <button type="button" class="heatmap-toggle-btn" id="heatmap12Btn">12M</button>
+          </div>
         </div>
       </div>
       <div class="heatmap-layout">
@@ -1359,6 +1369,19 @@ function renderAnswerActivityHeatmap(){
   });
 }
 
+const HEATMAP_SPLIT_KEY = 'answeros_heatmap_split_v1';
+const heatmapSplitSlider = document.getElementById('heatmapSplitSlider');
+const savedHeatmapSplit = Number(localStorage.getItem(HEATMAP_SPLIT_KEY));
+if(heatmapSplitSlider){
+  const initialSplit = Number.isFinite(savedHeatmapSplit) && savedHeatmapSplit >= 320 && savedHeatmapSplit <= 620 ? savedHeatmapSplit : 460;
+  heatmapSplitSlider.value = initialSplit;
+  document.documentElement.style.setProperty('--heatmap-detail-width', initialSplit + 'px');
+  heatmapSplitSlider.addEventListener('input', ()=>{
+    const width = Math.max(320, Math.min(620, Number(heatmapSplitSlider.value) || 460));
+    document.documentElement.style.setProperty('--heatmap-detail-width', width + 'px');
+    localStorage.setItem(HEATMAP_SPLIT_KEY, String(width));
+  });
+}
 renderAnswerActivityHeatmap();
 renderHeatmapDayDetail();
 document.getElementById('heatmap6Btn').addEventListener('click',()=>{
