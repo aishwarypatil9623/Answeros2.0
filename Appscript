@@ -4166,16 +4166,15 @@ function doGet(e) {
     }
 
 
-    const range =
-      sheet.getRange(
-        1,
-        1,
-        lastRow,
-        lastColumn
-      );
-
-    const values = range.getValues();
-    const formulas = range.getFormulas();
+    const values =
+      sheet
+        .getRange(
+          1,
+          1,
+          lastRow,
+          lastColumn
+        )
+        .getValues();
 
 
     const headerRow =
@@ -4200,29 +4199,7 @@ function doGet(e) {
           headerRow.forEach(
             function(header, i) {
 
-              let value = row[i];
-
-              /*
-               * HYPERLINK() cells return only their display text
-               * through getValues(). For Checked Copy, AnswerOS
-               * needs the actual Drive URL so it can open the
-               * handwritten checked PDF rather than falling back
-               * to the Detailed Evaluation PDF ID.
-               */
-              if (header === 'Checked Copy') {
-
-                const formula = formulas[values.indexOf(row)][i] || '';
-                const match = formula.match(
-                  /^=HYPERLINK\\(\\s*"((?:""|[^"])*)"/i
-                );
-
-                if (match) {
-                  value = match[1].replace(/""/g, '"');
-                }
-
-              }
-
-              obj[header] = value;
+              obj[header] = row[i];
 
             }
           );
