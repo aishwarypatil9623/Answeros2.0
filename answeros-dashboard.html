@@ -355,15 +355,16 @@
 
   /* Answer Activity heatmap */
   .dashboard-heatmap-card .heatmap-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
-  .dashboard-heatmap-card .heatmap-view-control{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);background:var(--card);border-radius:7px;}
-  .dashboard-heatmap-card .heatmap-view-label{font-size:9px;font-weight:800;color:var(--ink-500);text-transform:uppercase;letter-spacing:.04em;}
-  .dashboard-heatmap-card .heatmap-split-slider{width:105px;height:14px;accent-color:var(--green-700);cursor:pointer;}
   .dashboard-heatmap-card .heatmap-toggle{display:inline-flex;align-items:center;padding:2px;background:var(--ink-100);border:1px solid var(--line);border-radius:7px;gap:2px;}
   .dashboard-heatmap-card .heatmap-toggle-btn{border:0;background:transparent;color:var(--ink-500);border-radius:5px;padding:4px 8px;font:700 10px/1.1 inherit;cursor:pointer;min-width:28px;}
   .dashboard-heatmap-card .heatmap-toggle-btn.active{background:#fff;color:var(--green-800);box-shadow:0 1px 2px rgba(0,0,0,.08);}
   .dashboard-heatmap-card .heatmap-subtitle{font-size:10px;color:var(--ink-500);margin:-3px 0 8px 0;}
-  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(560px,1fr) minmax(320px,var(--heatmap-detail-width,460px));gap:16px;align-items:stretch;}
+  .dashboard-heatmap-card .heatmap-layout{display:grid;grid-template-columns:minmax(450px,1fr) 10px minmax(320px,var(--heatmap-detail-width,460px));gap:10px;align-items:stretch;}
   .dashboard-heatmap-card .heatmap-main{min-width:0;}
+  .dashboard-heatmap-card .heatmap-splitter{width:10px;min-width:10px;border-radius:6px;cursor:col-resize;position:relative;touch-action:none;align-self:stretch;background:transparent;transition:background .15s ease;}
+  .dashboard-heatmap-card .heatmap-splitter::after{content:"";position:absolute;left:4px;top:50%;width:2px;height:42px;transform:translateY(-50%);border-radius:2px;background:var(--ink-200);transition:height .15s ease,background .15s ease;}
+  .dashboard-heatmap-card .heatmap-splitter:hover,.dashboard-heatmap-card .heatmap-splitter.dragging{background:var(--green-50);}
+  .dashboard-heatmap-card .heatmap-splitter:hover::after,.dashboard-heatmap-card .heatmap-splitter.dragging::after{height:58px;background:var(--green-700);}
   .dashboard-heatmap-card .heatmap-legend{margin-top:10px;padding-top:9px;gap:5px;}
   .dashboard-heatmap-card .heatmap-legend .sw{width:11px;height:11px;border-radius:3px;}
   .dashboard-heatmap-card .heatmap-day-detail{min-height:122px;margin:0;padding:12px;background:var(--green-50);border:1px solid var(--line);border-radius:9px;display:flex;flex-direction:column;justify-content:center;}
@@ -382,6 +383,7 @@
   .dashboard-heatmap-card .heatmap-cell.cal-4{background:#155c2a;color:#fff;}
   @media(max-width:900px){
     .dashboard-heatmap-card .heatmap-layout{grid-template-columns:1fr;}
+    .dashboard-heatmap-card .heatmap-splitter{display:none;}
     .dashboard-heatmap-card .heatmap-day-detail{min-height:90px;}
   }
   .dashboard-heatmap-card .heatmap-scroll{overflow-x:auto;padding-bottom:2px;}
@@ -569,11 +571,7 @@
           <div class="heatmap-subtitle" id="heatmapSubtitle">Last 6 months</div>
         </div>
         <div class="heatmap-controls">
-          <div class="heatmap-view-control">
-            <span class="heatmap-view-label">Details</span>
-            <input id="heatmapSplitSlider" class="heatmap-split-slider" type="range" min="320" max="620" step="10" value="460" aria-label="Adjust details panel width" title="Adjust details panel width">
-          </div>
-          <div class="heatmap-toggle" role="group" aria-label="Heatmap range">
+  <div class="heatmap-toggle" role="group" aria-label="Heatmap range">
             <button type="button" class="heatmap-toggle-btn active" id="heatmap6Btn">6M</button>
             <button type="button" class="heatmap-toggle-btn" id="heatmap12Btn">12M</button>
           </div>
@@ -600,6 +598,7 @@
             <span style="font-size:10px;color:var(--ink-500);margin-left:2px;">More</span>
           </div>
         </div>
+        <div class="heatmap-splitter" id="heatmapSplitter" role="separator" aria-orientation="vertical" aria-label="Resize Answer Activity panels" tabindex="0" title="Drag to resize"></div>
         <aside class="heatmap-day-detail" id="heatmapDayDetail">
           <div class="heatmap-empty-title">Daily activity</div>
           <div class="heatmap-empty-text">Click any day to inspect the answers you wrote, scores and subjects.</div>
@@ -1370,16 +1369,67 @@ function renderAnswerActivityHeatmap(){
 }
 
 const HEATMAP_SPLIT_KEY = 'answeros_heatmap_split_v1';
-const heatmapSplitSlider = document.getElementById('heatmapSplitSlider');
+const heatmapSplitter = document.getElementById('heatmapSplitter');
+const heatmapLayout = document.querySelector('.dashboard-heatmap-card .heatmap-layout');
 const savedHeatmapSplit = Number(localStorage.getItem(HEATMAP_SPLIT_KEY));
-if(heatmapSplitSlider){
-  const initialSplit = Number.isFinite(savedHeatmapSplit) && savedHeatmapSplit >= 320 && savedHeatmapSplit <= 620 ? savedHeatmapSplit : 460;
-  heatmapSplitSlider.value = initialSplit;
-  document.documentElement.style.setProperty('--heatmap-detail-width', initialSplit + 'px');
-  heatmapSplitSlider.addEventListener('input', ()=>{
-    const width = Math.max(320, Math.min(620, Number(heatmapSplitSlider.value) || 460));
-    document.documentElement.style.setProperty('--heatmap-detail-width', width + 'px');
-    localStorage.setItem(HEATMAP_SPLIT_KEY, String(width));
+
+if(heatmapSplitter && heatmapLayout){
+  const MIN_DETAIL_WIDTH = 320;
+  const MAX_DETAIL_WIDTH = 620;
+  const DEFAULT_DETAIL_WIDTH = 460;
+  const initialSplit = Number.isFinite(savedHeatmapSplit) && savedHeatmapSplit >= MIN_DETAIL_WIDTH && savedHeatmapSplit <= MAX_DETAIL_WIDTH
+    ? savedHeatmapSplit
+    : DEFAULT_DETAIL_WIDTH;
+
+  const applyHeatmapSplit = width => {
+    const clamped = Math.max(MIN_DETAIL_WIDTH, Math.min(MAX_DETAIL_WIDTH, width));
+    document.documentElement.style.setProperty('--heatmap-detail-width', clamped + 'px');
+    return clamped;
+  };
+
+  applyHeatmapSplit(initialSplit);
+
+  const startDrag = (clientX, pointerId) => {
+    const startWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heatmap-detail-width')) || DEFAULT_DETAIL_WIDTH;
+    const startX = clientX;
+    heatmapSplitter.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    heatmapSplitter.setPointerCapture?.(pointerId);
+
+    const onMove = ev => {
+      const width = applyHeatmapSplit(startWidth - (ev.clientX - startX));
+      localStorage.setItem(HEATMAP_SPLIT_KEY, String(width));
+    };
+
+    const onEnd = () => {
+      heatmapSplitter.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      heatmapSplitter.removeEventListener('pointermove', onMove);
+      heatmapSplitter.removeEventListener('pointerup', onEnd);
+      heatmapSplitter.removeEventListener('pointercancel', onEnd);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    heatmapSplitter.addEventListener('pointermove', onMove);
+    heatmapSplitter.addEventListener('pointerup', onEnd);
+    heatmapSplitter.addEventListener('pointercancel', onEnd);
+  };
+
+  heatmapSplitter.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    startDrag(e.clientX, e.pointerId);
+  });
+
+  heatmapSplitter.addEventListener('keydown', e => {
+    const current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heatmap-detail-width')) || DEFAULT_DETAIL_WIDTH;
+    const step = e.shiftKey ? 50 : 20;
+    if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+      e.preventDefault();
+      const direction = e.key === 'ArrowLeft' ? -1 : 1;
+      const width = applyHeatmapSplit(current + direction * step);
+      localStorage.setItem(HEATMAP_SPLIT_KEY, String(width));
+      window.dispatchEvent(new Event('resize'));
+    }
   });
 }
 renderAnswerActivityHeatmap();
