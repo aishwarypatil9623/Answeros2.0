@@ -551,13 +551,14 @@ function render(){
             </div>
           </div>
           <div class="adetail-resizer" title="Drag to resize"></div>
-          ${a.pdfId ? `
+          ${getCheckedCopyId(a) || a.pdfId ? `
           <div class="adetail-pdf">
             <div class="adetail-pdf-head">
-              <span>Answer PDF</span>
-              <a href="https://drive.google.com/file/d/${a.pdfId}/view" target="_blank" rel="noopener">Open full ↗</a>
+              <span>${getCheckedCopyId(a) ? 'Checked Answer Copy' : 'Answer PDF'}</span>
+              <a href="https://drive.google.com/file/d/${getCheckedCopyId(a) || a.pdfId}/view" target="_blank" rel="noopener">Open full ↗</a>
             </div>
-            <iframe src="https://drive.google.com/file/d/${a.pdfId}/preview" loading="lazy" allow="autoplay"></iframe>
+            <iframe src="https://drive.google.com/file/d/${getCheckedCopyId(a) || a.pdfId}/preview" loading="lazy" allow="autoplay"></iframe>
+          </div>` : `
           </div>` : `
           <div class="adetail-pdf">
             <div class="adetail-pdf-head"><span>Answer PDF</span></div>
@@ -595,6 +596,14 @@ function render(){
       render();
     });
   });
+}
+
+function getCheckedCopyId(answer){
+  try{
+    const value=String(answer&&answer['Checked Copy']||'').trim();
+    const match=value.match(/[A-Za-z0-9_-]{20,}/);
+    return match?match[0]:'';
+  }catch(_){return '';}
 }
 
 function formatDash(text){
