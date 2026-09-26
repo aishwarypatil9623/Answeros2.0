@@ -790,7 +790,17 @@ document.getElementById('darkToggle').addEventListener('click', function(){
    Max Marks, Status ... etc.
    Replace this array with real rows pasted from the sheet.
 ============================================================ */
-const ALL_ANSWERS = AnswerOSData.getAnswers();
+const ALL_ANSWERS = AnswerOSData.getAnswers().map(a=>{
+  const rawPaper=String(a.paperRaw||a.paper||a.Paper||'').trim();
+  const paper=(typeof AnswerOSData.normalizePaper==='function'
+    ? AnswerOSData.normalizePaper(rawPaper)
+    : rawPaper) || 'Unmapped';
+  return Object.assign({},a,{
+    paperRaw:rawPaper,
+    paper,
+    paperKnown:/^(?:GS[1-4]|PSIR P[12]|Essay)$/.test(paper)
+  });
+});
 
 const DASHBOARD_SOURCE_KEY = 'answeros_dashboard_source_v1';
 const dashboardSourceFilter = document.getElementById('dashboardSourceFilter');
@@ -811,9 +821,27 @@ if(dashboardSourceFilter){
     window.location.reload();
   });
 }
-const SUBJECT_COLORS = {GS1:'#3b6fd5', GS2:'#2c8a46', GS3:'#7a4fd5', GS4:'#e0762c', Essay:'#e0a021', PSIR:'#22a3a3', ['PSIR P1']:'#0f766e', ['PSIR P2']:'#0891b2'};
-const SUBJECT_LABELS = {};
-const subjectLabel = s => s;
+const SUBJECT_COLORS = {
+  GS1:'#3b6fd5',
+  GS2:'#2c8a46',
+  GS3:'#7a4fd5',
+  GS4:'#e0762c',
+  Essay:'#e0a021',
+  ['PSIR P1']:'#0f766e',
+  ['PSIR P2']:'#0891b2'
+};
+const SUBJECT_LABELS = {
+  GS1:'GS1',
+  GS2:'GS2',
+  GS3:'GS3',
+  GS4:'GS4',
+  Essay:'Essay',
+  ['PSIR P1']:'PSIR P1',
+  ['PSIR P2']:'PSIR P2'
+};
+const UNKNOWN_SUBJECT_COLOR = '#9aa5a0';
+const subjectLabel = s => SUBJECT_LABELS[s] || (s ? `Unmapped · ${s}` : 'Unspecified');
+const subjectColor = s => SUBJECT_COLORS[s] || UNKNOWN_SUBJECT_COLOR;
 
 /* ---------- evaluation-platform tier badges (Topper/Achiever/Learner/Beginner) ----------
    Thresholds observed from the platform's own Result screen, given in raw marks out of 15:
@@ -1007,7 +1035,7 @@ function scoreTier(s){ return s>=65 ? {bg:'#e6f4ea',fg:'#1c5c30'} : s>=45 ? {bg:
 document.getElementById('totalAnswersDonut').textContent = totalAnswers;
 new Chart(document.getElementById('subjectDonut'), {
   type:'doughnut',
-  data:{ labels: subjLabels, datasets:[{ data: subjLabels.map(s=>subjCounts[s]), backgroundColor: subjLabels.map(s=>SUBJECT_COLORS[s]||'#ccc'), borderWidth:3, borderColor:'#fff' }] },
+  data:{ labels: subjLabels, datasets:[{ data: subjLabels.map(s=>subjCounts[s]), backgroundColor: subjLabels.map(subjectColor), borderWidth:3, borderColor:'#fff' }] },
   options:{ cutout:'70%', onClick:(evt,elements)=>{ if(elements.length) jumpToSubject(subjLabels[elements[0].index]); },
     plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>{
     const s = ctx.label; const avg = subjScoreSum[s]/subjCounts[s];
@@ -1039,7 +1067,7 @@ document.getElementById('subjectPerf').innerHTML = subjLabels.map(s=>{
   const trendHtml = trend ? `<span class="subj-trend ${trend.dir}" title="Second half of your ${subjectLabel(s)} answers vs the first half">${trend.glyph}</span>` : `<span class="subj-trend"></span>`;
   const focusTag = s===subjWeakest.paper ? `<span class="subj-focus-tag">Focus</span>` : '';
   return `<div class="subj-leg-row" data-subj="${s}">
-    <div class="subj-leg-dot" style="background:${SUBJECT_COLORS[s]};"></div>
+    <div class="subj-leg-dot" style="background:${subjectColor(s)};"></div>
     <div class="subj-leg-label"><b>${subjectLabel(s)}</b> <span class="subj-leg-count">${count} · ${share}%</span>${focusTag}</div>
     ${trendHtml}
     <div class="subj-leg-score" style="background:${tier.bg};color:${tier.fg};">${avg.toFixed(0)}%</div>
@@ -1065,7 +1093,11 @@ const isUnderPracticed = mostSkewedShare < idealShare*0.6;
 const balanceNote = subjLabels.length>=3 && Math.abs(mostSkewedShare-idealShare)>15
   ? ` ${isUnderPracticed ? `<b>${subjectLabel(mostSkewed.paper)}</b> is under-practiced at just ${mostSkewedShare}% of your answers — every paper counts equally toward Mains, so a gap this size compounds.` : `<b>${subjectLabel(mostSkewed.paper)}</b> dominates your practice at ${mostSkewedShare}% — worth rebalancing toward your other papers.`}`
   : '';
-document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjectLabel(subjHeaviest.paper)}</b> (${subjHeaviest.n} answers), but <b>${subjectLabel(subjWeakest.paper)}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.`;
+const unmappedPapers = [...new Set(ANSWERS.filter(a=>!a.paperKnown).map(a=>a.paper||a.paperRaw||'Unspecified'))];
+const unmappedNote = unmappedPapers.length
+  ? ` <br><b>Data check:</b> ${unmappedPapers.length} paper name${unmappedPapers.length===1?'':'s'} could not be mapped to a standard paper label: ${unmappedPapers.map(p=>`<code>${p}</code>`).join(', ')}. They remain visible instead of breaking the dashboard.`
+  : '';
+document.getElementById('subjectInsight').innerHTML = `You've written most in <b>${subjectLabel(subjHeaviest.paper)}</b> (${subjHeaviest.n} answers), but <b>${subjectLabel(subjWeakest.paper)}</b> is scoring lowest at ${subjWeakest.avg.toFixed(0)}%.${balanceNote} Ring size = share of practice, score badge = where marks are landing, ▲▼ = improving or slipping over your last answers there. Click a row to jump to it.${unmappedNote}`;
 
 /* ---------- score trend line (functional filter: range + subject) ---------- */
 const sortedAll = [...ANSWERS].sort((a,b)=> new Date(a.date)-new Date(b.date));
@@ -1691,7 +1723,7 @@ new Chart(document.getElementById('pyqDonut'),{type:'doughnut',
 /* ---------- PYQ progress by subject (sample) ---------- */
 const pyqBySubj = [['GS1',60],['GS2',62],['GS3',44],['GS4',36],['Essay',50]];
 document.getElementById('pyqProgress').innerHTML = pyqBySubj.map(([s,pct])=>`
-  <div class="pb-row"><div class="pb-label">${s}</div><div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${SUBJECT_COLORS[s]||'#2c8a46'}"></div></div><div class="pb-val">${pct}%</div></div>
+  <div class="pb-row"><div class="pb-label">${s}</div><div class="pb-track"><div class="pb-fill" style="width:${pct}%;background:${subjectColor(s)}"></div></div><div class="pb-val">${pct}%</div></div>
 `).join('');
 
 /* ---------- overall progress ---------- */

@@ -37,20 +37,48 @@
   }
   function normalizePaper(value){
     const raw=String(value==null?'':value).trim().toUpperCase();
-    // Canonical PSIR labels at the data-ingestion boundary. Punctuation,
-    // spacing, separators, leading zeros, and common number words/roman numerals
-    // are normalized first so source formatting can never leak into the UI.
+    // Canonicalize paper names at the data-ingestion boundary. The Sheet has
+    // historically contained variants such as "GS PAPER III", "GS-3",
+    // "GSPAPERIII", "PSIR PAPER I", etc. All known aliases collapse to one
+    // stable key so charts, filters, and cross-page links cannot split the
+    // same paper into multiple buckets.
     const cleaned=raw
       .replace(/[‐‑‒–—−]/g,'-')
       .replace(/[^A-Z0-9IV]+/g,' ')
       .replace(/\s+/g,' ')
       .trim();
     const compact=cleaned.replace(/\s+/g,'');
-    const p1=/^PSIR(?:P|PAPER)?(?:0*1|I|ONE)$/;
-    const p2=/^PSIR(?:P|PAPER)?(?:0*2|II|TWO)$/;
-    if(p1.test(compact))return 'PSIR P1';
-    if(p2.test(compact))return 'PSIR P2';
-    return cleaned.replace(/\s+/g,'');
+
+    function tokenNumber(token){
+      const t=String(token||'').toUpperCase();
+      const roman={I:1,II:2,III:3,IV:4};
+      if(roman[t])return roman[t];
+      const digits=t.replace(/\D/g,'');
+      return digits?Number(digits):null;
+    }
+
+    const gsMatch =
+      cleaned.match(/^(?:GS|GENERAL STUDIES)(?: PAPER)?\s*(0?[1-4]|I|II|III|IV)$/) ||
+      compact.match(/^GS(?:PAPER)?(0?[1-4]|I|II|III|IV)$/);
+    if(gsMatch){
+      const n=tokenNumber(gsMatch[1]);
+      if(n>=1&&n<=4)return 'GS'+n;
+    }
+
+    const psirMatch =
+      cleaned.match(/^PSIR(?: P(?:APER)?| PAPER)?\s*(0?[12]|I|II)$/) ||
+      compact.match(/^PSIR(?:P|PAPER)(0?[12]|I|II)$/) ||
+      cleaned.match(/^POLITICAL SCIENCE AND INTERNATIONAL RELATIONS(?: PAPER)?\s*(0?[12]|I|II)$/);
+    if(psirMatch){
+      const n=tokenNumber(psirMatch[1]);
+      if(n===1||n===2)return 'PSIR P'+n;
+    }
+
+    if(compact==='ESSAY'||compact==='ESSAYS')return 'Essay';
+
+    // Unknown values are preserved in a cleaned form instead of throwing or
+    // silently disappearing. The dashboard can surface them as unmapped data.
+    return cleaned;
   }
   function toNumber(value){if(value===''||value==null)return null;const n=Number(String(value).replace(/,/g,'').replace('%',''));return Number.isFinite(n)?n:null;}
   function toDateString(value){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -91,7 +119,9 @@
     return Object.assign({},row,{
       id:String(row['PDF ID']||`${date}-${normalizePaper(row.Paper)}-${index}`),
       date,
+      paperRaw:String(row.Paper==null?'':row.Paper).trim(),
       paper:normalizePaper(row.Paper),
+      paperKnown:/^(?:GS[1-4]|PSIR P[12]|Essay)$/.test(normalizePaper(row.Paper)),
       subject:String(row.Subject||'').trim(),
       source:String(row['Question Source']||'').trim().toUpperCase(),
       subtopic:String(row.Subtopic||'').trim(),
@@ -142,5 +172,5 @@
   function today(){return new Date();}
   function formatDate(value){const d=value instanceof Date?value:new Date(value);return toDateString(d);}
   function initPage(options){const opts=Object.assign({reloadOnChange:true},options||{});const config=getConfig();sync(opts).catch(error=>{console.warn('[AnswerOS] Sync failed; using cached data.',error);window.dispatchEvent(new CustomEvent('answeros:sync-error',{detail:{error}}));});if(config.autoSyncEnabled){const ms=Math.max(5,Number(config.syncIntervalMinutes)||30)*60*1000;window.setInterval(()=>{sync(opts).catch(error=>console.warn('[AnswerOS] Auto-sync failed.',error));},ms);}}
-  window.AnswerOSData={STORAGE,DEFAULTS,getConfig,saveConfig,getAnswers,getLastSync,normalizeRows,sync,initPage,today,formatDate,getRevisionState,saveRevisionState,getNotes,saveNote,deleteNote};
+  window.AnswerOSData={STORAGE,DEFAULTS,getConfig,saveConfig,getAnswers,getLastSync,normalizePaper,normalizeRows,sync,initPage,today,formatDate,getRevisionState,saveRevisionState,getNotes,saveNote,deleteNote};
 })();
