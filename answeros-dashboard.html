@@ -177,6 +177,17 @@
   .card-head h3{font-size:14px;margin:0;letter-spacing:-0.01em;}
   .link-btn{font-size:11.5px;color:var(--green-700);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:2px;}
   .dropdown{font-size:11.5px;color:var(--ink-500);border:1px solid var(--line);border-radius:7px;padding:4px 8px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+  .dashboard-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:-6px 0 16px;box-shadow:var(--shadow);}
+  .dashboard-filter-label{font-size:11px;font-weight:800;color:var(--ink-700);}
+  .source-chip-group{display:flex;gap:6px;flex-wrap:wrap;}
+  .source-chip{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink-700);background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
+  .source-chip:hover{border-color:var(--chip-clr,var(--green-500));}
+  .source-chip .sc-dot{width:7px;height:7px;border-radius:50%;background:var(--chip-clr,var(--ink-300));flex:0 0 auto;}
+  .source-chip .sc-count{font-weight:800;font-size:10px;color:var(--ink-500);background:var(--bg);border-radius:999px;padding:1px 6px;}
+  .source-chip.active{background:var(--chip-clr,var(--green-600));border-color:var(--chip-clr,var(--green-600));color:#fff;}
+  .source-chip.active .sc-dot{background:rgba(255,255,255,.85);}
+  .source-chip.active .sc-count{background:rgba(255,255,255,.22);color:#fff;}
+  .source-chip.is-loading{opacity:.6;pointer-events:none;}
 
   /* Quick stats strip */
   .quickstats{
@@ -476,16 +487,10 @@
       </div>
     </div>
 
-    <!-- Dashboard filters: visual-only in Step 2; wiring comes in the next step. -->
+    <!-- Dashboard filters -->
     <div class="dashboard-filter-bar" aria-label="Dashboard filters">
       <span class="dashboard-filter-label">Source</span>
-      <select id="dashboardSourceFilter" class="dropdown" aria-label="Filter dashboard by question source" style="font-family:inherit;font-size:11.5px;appearance:none;background:#fff;min-width:120px;">
-        <option value="all">All Sources</option>
-        <option value="DMQ">DMQ</option>
-        <option value="PYQ">PYQ</option>
-        <option value="WS">WS</option>
-        <option value="LAWS">LAWS</option>
-      </select>
+      <div class="source-chip-group" id="dashboardSourceChips" role="radiogroup" aria-label="Filter dashboard by question source"></div>
     </div>
 
     <!-- Quick Stats -->
@@ -803,11 +808,7 @@ const ALL_ANSWERS = AnswerOSData.getAnswers().map(a=>{
 });
 
 const DASHBOARD_SOURCE_KEY = 'answeros_dashboard_source_v1';
-const dashboardSourceFilter = document.getElementById('dashboardSourceFilter');
 const savedDashboardSource = localStorage.getItem(DASHBOARD_SOURCE_KEY) || 'all';
-if(dashboardSourceFilter){
-  dashboardSourceFilter.value = savedDashboardSource;
-}
 
 const ANSWERS = savedDashboardSource === 'all'
   ? ALL_ANSWERS
@@ -815,12 +816,64 @@ const ANSWERS = savedDashboardSource === 'all'
 
 ANSWERS.forEach(a=> { a.demand = a.demandPct == null ? (a.demand || 0) : a.demandPct; });
 
-if(dashboardSourceFilter){
-  dashboardSourceFilter.addEventListener('change', ()=>{
-    localStorage.setItem(DASHBOARD_SOURCE_KEY, dashboardSourceFilter.value);
-    window.location.reload();
+/* Source filter chips — dynamic, counted, and colour-coded. */
+(function renderSourceChips(){
+  const box = document.getElementById('dashboardSourceChips');
+  if(!box) return;
+
+  const PREFERRED = ['DMQ','PYQ','WS','LAWS'];
+  const SOURCE_COLORS = {
+    all:'#2c8a46',
+    DMQ:'#3b6fd5',
+    PYQ:'#7a4fd5',
+    WS:'#22a3a3',
+    LAWS:'#c98a1f'
+  };
+  const FALLBACK_PALETTE = ['#e0762c','#b3402c','#3ba55c','#6b7278'];
+
+  const counts = {};
+  ALL_ANSWERS.forEach(a=>{
+    const s = String(a.source || '').trim().toUpperCase();
+    if(s) counts[s] = (counts[s] || 0) + 1;
   });
-}
+
+  const found = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  const ordered = PREFERRED.filter(s=>counts[s]).concat(
+    found.filter(s=>!PREFERRED.includes(s))
+  );
+
+  let fallbackIdx = 0;
+  const options = [{value:'all',label:'All Sources',count:ALL_ANSWERS.length}]
+    .concat(ordered.map(s=>({value:s,label:s,count:counts[s]})));
+
+  box.innerHTML = options.map(o=>{
+    const color = SOURCE_COLORS[o.value] ||
+      FALLBACK_PALETTE[fallbackIdx++ % FALLBACK_PALETTE.length];
+
+    return `
+      <button type="button"
+        class="source-chip${o.value===savedDashboardSource?' active':''}"
+        style="--chip-clr:${color}"
+        role="radio"
+        aria-checked="${o.value===savedDashboardSource}"
+        data-value="${o.value}">
+        <span class="sc-dot"></span>
+        ${o.label}
+        <span class="sc-count">${o.count}</span>
+      </button>`;
+  }).join('');
+
+  box.querySelectorAll('.source-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      if(chip.classList.contains('active')) return;
+
+      box.querySelectorAll('.source-chip').forEach(c=>c.classList.add('is-loading'));
+      chip.classList.add('active');
+      localStorage.setItem(DASHBOARD_SOURCE_KEY, chip.dataset.value);
+      window.location.reload();
+    });
+  });
+})();
 const SUBJECT_COLORS = {
   GS1:'#3b6fd5',
   GS2:'#2c8a46',
