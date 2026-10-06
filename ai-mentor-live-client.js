@@ -50,16 +50,19 @@
     return report;
   }
 
-  async function sendMentorPacket(backendUrl, options) {
+  async function sendMentorPacket(backendUrl, accessToken, options) {
     if (!backendUrl || typeof backendUrl !== 'string') {
       throw new Error('A Mentor backend Web App URL is required.');
+    }
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('A Mentor access token is required.');
     }
 
     const packet = buildRealMentorPacket(options);
     const response = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packet })
+      body: JSON.stringify({ accessToken, packet })
     });
 
     const payload = await response.json();
