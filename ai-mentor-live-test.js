@@ -26,14 +26,18 @@
     };
   }
 
-  async function runLive(backendUrl, options) {
+  async function runLive(backendUrl, accessToken, options) {
     const client = requireClient_();
 
     if (typeof client.sendMentorPacket !== 'function') {
       throw new Error('AnswerOSMentorLiveClient.sendMentorPacket is unavailable.');
     }
 
-    const result = await client.sendMentorPacket(backendUrl, options || {});
+    const result = await client.sendMentorPacket(
+      backendUrl,
+      accessToken,
+      options || {}
+    );
 
     return {
       version: VERSION,
