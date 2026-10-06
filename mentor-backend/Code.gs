@@ -51,40 +51,46 @@ function doGet() {
 
 function doPost(e) {
   try {
-    const body = parseRequest_(e);
-
-    if (!isAuthorized_(body)) {
-      return jsonOutput_({
-        ok: false,
-        error: 'UNAUTHORIZED'
-      });
+    if (e && e.parameter && e.parameter.mentorUi === '1') {
+      return handleMentorUiPost_(e);
     }
-
-    const packet = body && body.packet ? body.packet : body;
-
-    if (!packet || typeof packet !== 'object') {
-      return jsonOutput_({
-        ok: false,
-        error: 'INVALID_PACKET'
-      });
-    }
-
-    const report = generateMentorReport_(packet);
-
-    return jsonOutput_({
-      ok: true,
-      version: MENTOR_BACKEND_VERSION,
-      report
-    });
-  } catch (error) {
+    const body=parseRequest_(e);
+    if(!isAuthorized_(body)) return jsonOutput_({ok:false,error:'UNAUTHORIZED'});
+    const packet=body && body.packet ? body.packet : body;
+    if(!packet || typeof packet!=='object') return jsonOutput_({ok:false,error:'INVALID_PACKET'});
+    const report=generateMentorReport_(packet);
+    return jsonOutput_({ok:true,version:MENTOR_BACKEND_VERSION,report});
+  } catch(error) {
     console.error(error && error.stack ? error.stack : error);
-
-    return jsonOutput_({
-      ok: false,
-      error: 'MENTOR_BACKEND_ERROR',
-      message: error && error.message ? error.message : String(error)
-    });
+    return jsonOutput_({ok:false,error:'MENTOR_BACKEND_ERROR',message:error && error.message ? error.message : String(error)});
   }
+}
+
+function handleMentorUiPost_(e) {
+  const accessToken=e && e.parameter ? e.parameter.accessToken || '' : '';
+  if(!isAuthorized_({accessToken})) {
+    return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Unauthorized','The Mentor access token was rejected. No Gemini request was made.')).setTitle('AnswerOS AI Mentor');
+  }
+  const rawPacket=e && e.parameter ? e.parameter.packet || '' : '';
+  if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Missing Mentor Packet','The dashboard did not send a Mentor Packet.')).setTitle('AnswerOS AI Mentor');
+  const packet=JSON.parse(rawPacket);
+  if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Invalid Mentor Packet','The submitted Mentor Packet could not be parsed.')).setTitle('AnswerOS AI Mentor');
+  const report=generateMentorReport_(packet);
+  return HtmlService.createHtmlOutput(buildMentorReportHtml_(report)).setTitle('AnswerOS AI Mentor');
+}
+
+function buildMentorReportHtml_(report) {
+  const observations=report.observations.map(function(item){return '<li>'+escapeHtml_(item)+'</li>';}).join('');
+  const actions=report.actions.map(function(item){return '<li><strong>'+escapeHtml_(item.action)+'</strong>'+(item.target?' · '+escapeHtml_(item.target):'')+'<br><span>'+escapeHtml_(item.reason)+'</span></li>';}).join('');
+  return '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f6;color:#18211b;margin:0;padding:32px}.wrap{max-width:820px;margin:0 auto}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2c8a46}h1{font-size:30px;margin:6px 0 8px}.summary{font-size:17px;line-height:1.55;background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:20px;margin:22px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:18px}h2{font-size:14px;margin:0 0 12px}.focus{border-left:4px solid #2c8a46}.focus b{display:block;font-size:18px;margin-bottom:7px}ul{margin:0;padding-left:20px}li{margin:0 0 12px;line-height:1.45}li span{color:#526057;font-size:14px}.foot{margin-top:18px;color:#6a756d;font-size:12px}@media(max-width:700px){body{padding:18px}.grid{grid-template-columns:1fr}h1{font-size:25px}}</style></head><body><main class="wrap"><div class="eyebrow">AnswerOS · AI Mentor</div><h1>Today\'s Mentor Report</h1><div class="summary">'+escapeHtml_(report.summary)+'</div><div class="grid"><section class="card"><h2>What I\'m seeing</h2><ul>'+observations+'</ul></section><section class="card"><h2>What to do next</h2><ul>'+actions+'</ul></section></div><section class="card focus" style="margin-top:16px"><h2>Primary Focus</h2><b>'+escapeHtml_(report.focus.primary)+'</b><div>'+escapeHtml_(report.focus.why)+'</div><div style="margin-top:10px"><strong>Next step:</strong> '+escapeHtml_(report.focus.nextStep)+'</div></section><div class="foot">Generated from the current AnswerOS Mentor Packet. No dashboard data was modified.</div></main></body></html>';
+}
+
+function buildMentorErrorHtml_(title,message) {
+  return '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;background:#f6f8f6;padding:32px;color:#18211b}.box{max-width:700px;margin:auto;background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:24px}h1{font-size:24px}p{line-height:1.5;color:#526057}</style></head><body><div class="box"><h1>'+escapeHtml_(title)+'</h1><p>'+escapeHtml_(message)+'</p></div></body></html>';
+}
+
+function escapeHtml_(value) {
+  return String(value==null?'':value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function isAuthorized_(body) {
