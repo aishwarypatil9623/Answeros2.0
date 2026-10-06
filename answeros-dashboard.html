@@ -421,6 +421,23 @@
   .status-chip{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;}
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:#d7dcd8;border-radius:8px;}
+  /* AI Mentor slide-over */
+  .mentor-overlay{position:fixed;inset:0;background:rgba(15,23,18,.28);backdrop-filter:blur(2px);z-index:9000;opacity:0;pointer-events:none;transition:opacity .22s ease}
+  .mentor-overlay.open{opacity:1;pointer-events:auto}
+  .mentor-drawer{position:fixed;top:0;right:0;width:min(430px,92vw);height:100vh;background:var(--bg,#f7f9f7);border-left:1px solid var(--border,#e2e8e3);box-shadow:-18px 0 50px rgba(18,30,22,.16);z-index:9001;transform:translateX(100%);transition:transform .26s cubic-bezier(.22,.61,.36,1);display:flex;flex-direction:column}
+  .mentor-drawer.open{transform:translateX(0)}
+  .mentor-drawer-head{display:flex;justify-content:space-between;gap:16px;padding:22px 22px 18px;border-bottom:1px solid var(--border,#e2e8e3);background:var(--card,#fff)}
+  .mentor-eyebrow{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2c8a46;margin-bottom:5px}
+  .mentor-drawer-head h2{margin:0;font-size:22px;letter-spacing:-.02em}
+  .mentor-drawer-head p{margin:5px 0 0;font-size:12px;color:var(--muted,#68736c)}
+  .mentor-close-btn{width:32px;height:32px;border:1px solid var(--border,#e2e8e3);border-radius:10px;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer}
+  .mentor-drawer-body{position:relative;flex:1;min-height:0}
+  .mentor-frame{width:100%;height:100%;border:0;background:transparent}
+  .mentor-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted,#68736c);font-size:13px;background:var(--bg,#f7f9f7);z-index:2}
+  .mentor-loading[hidden],.mentor-frame[hidden]{display:none}
+  .mentor-spinner{width:22px;height:22px;border:2px solid rgba(44,138,70,.18);border-top-color:#2c8a46;border-radius:50%;animation:mentorSpin .8s linear infinite}
+  @keyframes mentorSpin{to{transform:rotate(360deg)}}
+  @media(max-width:700px){.mentor-drawer{width:100vw}.mentor-drawer-head{padding:18px}}
 </style>
 </head>
 <body>
@@ -475,6 +492,26 @@
         </button>
       </div>
       <div id="refreshToast" class="refresh-toast"></div>
+
+      <!-- AI Mentor slide-over -->
+      <div id="mentorOverlay" class="mentor-overlay" aria-hidden="true"></div>
+      <aside id="mentorDrawer" class="mentor-drawer" aria-hidden="true" aria-label="AI Mentor">
+        <div class="mentor-drawer-head">
+          <div>
+            <div class="mentor-eyebrow">AnswerOS · AI Mentor</div>
+            <h2 id="mentorDrawerTitle">Your Mentor</h2>
+            <p>One focused nudge for your preparation.</p>
+          </div>
+          <button id="mentorCloseBtn" class="mentor-close-btn" type="button" aria-label="Close AI Mentor">×</button>
+        </div>
+        <div class="mentor-drawer-body">
+          <div id="mentorLoading" class="mentor-loading" hidden>
+            <div class="mentor-spinner"></div>
+            <div>Looking at your latest answers…</div>
+          </div>
+          <iframe id="mentorFrame" name="answerosMentorFrame" title="AI Mentor report" class="mentor-frame" hidden></iframe>
+        </div>
+      </aside>
       <div class="top-stats">
         <div class="pill">
           <div class="pill-icon cal" id="icCal"></div>
@@ -1993,13 +2030,34 @@ document.getElementById('openSheetBtn').addEventListener('click', ()=>{
 });
 
 /* ---------- isolated AI Mentor launch ---------- */
-const MENTOR_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzqfRm0cWuhxIB6nb3swXw7abQL8gyPxlJobZvX8S6ye3l_QskCzAmcFMjdShmU8okm/exec';
+const MENTOR_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzqfRm0cWuhIB6nb3swXw7abQL8gyPxlJobZvX8S6ye3l_QskCzAmcFMjdShmU8okm/exec';
 const MENTOR_TOKEN_KEY = 'answeros_mentor_access_token_v1';
+const mentorDrawer = document.getElementById('mentorDrawer');
+const mentorOverlay = document.getElementById('mentorOverlay');
+const mentorFrame = document.getElementById('mentorFrame');
+const mentorLoading = document.getElementById('mentorLoading');
+
+function openMentorDrawer(){
+  mentorDrawer.classList.add('open');
+  mentorOverlay.classList.add('open');
+  mentorDrawer.setAttribute('aria-hidden','false');
+  mentorOverlay.setAttribute('aria-hidden','false');
+}
+function closeMentorDrawer(){
+  mentorDrawer.classList.remove('open');
+  mentorOverlay.classList.remove('open');
+  mentorDrawer.setAttribute('aria-hidden','true');
+  mentorOverlay.setAttribute('aria-hidden','true');
+}
+document.getElementById('mentorCloseBtn').addEventListener('click',closeMentorDrawer);
+mentorOverlay.addEventListener('click',closeMentorDrawer);
+document.addEventListener('keydown',(event)=>{ if(event.key==='Escape') closeMentorDrawer(); });
 
 function launchMentorReport(){
   if(!window.AnswerOSMentorOrchestrator || typeof window.AnswerOSMentorOrchestrator.buildPacket !== 'function'){
     throw new Error('AI Mentor modules are unavailable.');
   }
+
   let token = sessionStorage.getItem(MENTOR_TOKEN_KEY) || '';
   if(!token){
     token = window.prompt('Enter your AnswerOS AI Mentor access token. It is stored only for this browser session.');
@@ -2008,34 +2066,48 @@ function launchMentorReport(){
     if(!token) return;
     sessionStorage.setItem(MENTOR_TOKEN_KEY, token);
   }
+
   const packet = window.AnswerOSMentorOrchestrator.buildPacket({});
   if(!packet || packet.ok !== true) throw new Error('Unable to build the Mentor Packet.');
 
+  openMentorDrawer();
+  mentorFrame.hidden=true;
+  mentorLoading.hidden=false;
+
   const form=document.createElement('form');
-  form.method='POST'; form.action=MENTOR_BACKEND_URL; form.target='_blank'; form.style.display='none';
+  form.method='POST';
+  form.action=MENTOR_BACKEND_URL;
+  form.target='answerosMentorFrame';
+  form.style.display='none';
+
   const addField=(name,value)=>{
     const field=document.createElement('textarea');
-    field.name=name; field.value=value; form.appendChild(field);
+    field.name=name;
+    field.value=value;
+    form.appendChild(field);
   };
   addField('mentorUi','1');
   addField('accessToken',token);
   addField('packet',JSON.stringify(packet));
+
   document.body.appendChild(form);
+  mentorFrame.onload=()=>{
+    mentorLoading.hidden=true;
+    mentorFrame.hidden=false;
+  };
   form.submit();
   setTimeout(()=>form.remove(),1000);
-
-  const toast=document.getElementById('refreshToast');
-  if(toast){ toast.textContent='AI Mentor report is opening in a new tab.'; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),3000); }
 }
+
 document.getElementById('mentorBtn').addEventListener('click',()=>{
   try{ launchMentorReport(); }
   catch(err){
+    closeMentorDrawer();
     const toast=document.getElementById('refreshToast');
     if(toast){ toast.textContent='AI Mentor failed: '+err.message; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),4500); }
     else console.error(err);
   }
 });
-
 </script>
 
 
