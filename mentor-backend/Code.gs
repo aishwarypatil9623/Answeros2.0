@@ -69,14 +69,14 @@ function doPost(e) {
 function handleMentorUiPost_(e) {
   const accessToken=getRequestParameter_(e, 'accessToken');
   if(!isAuthorized_({accessToken})) {
-    return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Unauthorized','The Mentor access token was rejected. No Gemini request was made.')).setTitle('AnswerOS AI Mentor');
+    return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Unauthorized','The Mentor access token was rejected. No Gemini request was made.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
   const rawPacket=getRequestParameter_(e, 'packet');
-  if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Missing Mentor Packet','The dashboard did not send a Mentor Packet.')).setTitle('AnswerOS AI Mentor');
+  if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Missing Mentor Packet','The dashboard did not send a Mentor Packet.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   const packet=JSON.parse(rawPacket);
-  if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Invalid Mentor Packet','The submitted Mentor Packet could not be parsed.')).setTitle('AnswerOS AI Mentor');
+  if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Invalid Mentor Packet','The submitted Mentor Packet could not be parsed.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   const report=generateMentorReport_(packet);
-  return HtmlService.createHtmlOutput(buildMentorReportHtml_(report)).setTitle('AnswerOS AI Mentor');
+  return HtmlService.createHtmlOutput(buildMentorReportHtml_(report)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function getRequestParameter_(e, name) {
