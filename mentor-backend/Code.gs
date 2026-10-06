@@ -55,7 +55,7 @@ const MENTOR_REPORT_SCHEMA = {
 };
 
 function doGet() {
-  return jsonOutput({
+  return jsonOutput_({
     ok: true,
     service: 'AnswerOS AI Mentor',
     version: MENTOR_BACKEND_VERSION

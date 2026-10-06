@@ -97,13 +97,22 @@ function runMentorBackendTests() {
     return result.ok;
   }).length;
 
-  return {
+  const summary = {
     ok: passed === results.length,
     passed: passed,
     failed: results.length - passed,
     total: results.length,
     results: results
   };
+
+  console.log('AI Mentor Backend Tests');
+  console.log('Passed: ' + summary.passed);
+  console.log('Failed: ' + summary.failed);
+  console.log('Total: ' + summary.total);
+  console.log('Status: ' + (summary.ok ? 'PASS' : 'FAIL'));
+  console.log(JSON.stringify(summary.results));
+
+  return summary;
 }
 
 function testMentorBackend_(results, name, fn) {
