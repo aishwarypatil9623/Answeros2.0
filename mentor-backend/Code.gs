@@ -67,16 +67,26 @@ function doPost(e) {
 }
 
 function handleMentorUiPost_(e) {
+  const nonce=getRequestParameter_(e, 'nonce');
+  try {
   const accessToken=getRequestParameter_(e, 'accessToken');
   if(!isAuthorized_({accessToken})) {
-    return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Unauthorized','The Mentor access token was rejected. No Gemini request was made.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    return HtmlService.createHtmlOutput(buildMentorBridgeHtml_({ok:false,title:'Unauthorized',message:'The Mentor access token was rejected. No Gemini request was made.'}, nonce)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
   const rawPacket=getRequestParameter_(e, 'packet');
-  if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Missing Mentor Packet','The dashboard did not send a Mentor Packet.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorBridgeHtml_({ok:false,title:'Missing Mentor Packet',message:'The dashboard did not send a Mentor Packet.'}, nonce)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   const packet=JSON.parse(rawPacket);
-  if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Invalid Mentor Packet','The submitted Mentor Packet could not be parsed.')).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorBridgeHtml_({ok:false,title:'Invalid Mentor Packet',message:'The submitted Mentor Packet could not be parsed.'}, nonce)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   const report=generateMentorReport_(packet);
-  return HtmlService.createHtmlOutput(buildMentorReportHtml_(report)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return HtmlService.createHtmlOutput(buildMentorBridgeHtml_({ok:true,report:report}, nonce)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch(error) {
+    console.error(error && error.stack ? error.stack : error);
+    return HtmlService.createHtmlOutput(buildMentorBridgeHtml_({
+      ok:false,
+      title:'AI Mentor unavailable',
+      message:error && error.message ? error.message : String(error)
+    }, nonce)).setTitle('AnswerOS AI Mentor').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
 }
 
 function getRequestParameter_(e, name) {
@@ -102,6 +112,14 @@ function getRequestParameter_(e, name) {
   }
 
   return '';
+}
+
+function buildMentorBridgeHtml_(payload, nonce) {
+  const safePayload = JSON.stringify(payload).replace(/</g,'\\u003c');
+  const safeNonce = JSON.stringify(String(nonce || '')).replace(/</g,'\\u003c');
+  return '<!doctype html><html><body><script>' +
+    'window.parent.postMessage(Object.assign({type:"answeros-mentor-result",nonce:'+safeNonce+'},'+safePayload+'), "*");' +
+    '</script></body></html>';
 }
 
 function buildMentorReportHtml_(report) {

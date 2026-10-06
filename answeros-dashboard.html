@@ -432,7 +432,25 @@
   .mentor-drawer-head p{margin:5px 0 0;font-size:12px;color:var(--muted,#68736c)}
   .mentor-close-btn{width:32px;height:32px;border:1px solid var(--border,#e2e8e3);border-radius:10px;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer}
   .mentor-drawer-body{position:relative;flex:1;min-height:0}
-  .mentor-frame{width:100%;height:100%;border:0;background:transparent}
+  .mentor-bridge{position:absolute;width:1px;height:1px;border:0;opacity:0;pointer-events:none}
+  .mentor-content{height:100%;overflow:auto;padding:22px;background:var(--bg,#f7f9f7)}
+  .mentor-content[hidden]{display:none}
+  .mentor-report-hello{font-size:13px;color:#526057;margin-bottom:7px}
+  .mentor-report-summary{font-size:17px;line-height:1.48;font-weight:650;background:#fff;border:1px solid var(--line,#e1e7e2);border-radius:15px;padding:17px;margin-bottom:12px;box-shadow:0 4px 18px rgba(20,35,25,.04)}
+  .mentor-report-card{background:#fff;border:1px solid var(--line,#e1e7e2);border-radius:15px;padding:16px;margin-bottom:11px}
+  .mentor-report-eyebrow{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2c8a46;margin-bottom:7px}
+  .mentor-report-card ul{margin:0;padding-left:18px}
+  .mentor-report-card li{margin:0 0 9px;line-height:1.42;font-size:13px}
+  .mentor-report-card li:last-child{margin-bottom:0}
+  .mentor-report-card li span{color:#526057;font-size:12px}
+  .mentor-report-focus{border-left:4px solid #2c8a46}
+  .mentor-report-focus b{display:block;font-size:18px;margin-bottom:6px}
+  .mentor-report-focus .why{font-size:13px;line-height:1.45}
+  .mentor-report-focus .next{margin-top:9px;font-size:13px;line-height:1.45}
+  .mentor-report-foot{margin-top:13px;color:#7a847d;font-size:10.5px}
+  .mentor-report-error{background:#fff;border:1px solid #ead8d5;border-left:4px solid #b3402c;border-radius:15px;padding:17px;color:#18211b}
+  .mentor-report-error h3{margin:0 0 7px;font-size:16px}
+  .mentor-report-error p{margin:0;color:#526057;font-size:12.5px;line-height:1.5}
   .mentor-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted,#68736c);font-size:13px;background:var(--bg,#f7f9f7);z-index:2}
   .mentor-loading[hidden],.mentor-frame[hidden]{display:none}
   .mentor-spinner{width:22px;height:22px;border:2px solid rgba(44,138,70,.18);border-top-color:#2c8a46;border-radius:50%;animation:mentorSpin .8s linear infinite}
@@ -509,7 +527,8 @@
             <div class="mentor-spinner"></div>
             <div>Looking at your latest answers…</div>
           </div>
-          <iframe id="mentorFrame" name="answerosMentorFrame" title="AI Mentor report" class="mentor-frame" hidden></iframe>
+          <iframe id="mentorFrame" name="answerosMentorFrame" title="AI Mentor bridge" class="mentor-bridge" aria-hidden="true"></iframe>
+          <div id="mentorContent" class="mentor-content" hidden></div>
         </div>
       </aside>
       <div class="top-stats">
@@ -2036,6 +2055,8 @@ const mentorDrawer = document.getElementById('mentorDrawer');
 const mentorOverlay = document.getElementById('mentorOverlay');
 const mentorFrame = document.getElementById('mentorFrame');
 const mentorLoading = document.getElementById('mentorLoading');
+const mentorContent = document.getElementById('mentorContent');
+let mentorRequestNonce = '';
 
 function openMentorDrawer(){
   mentorDrawer.classList.add('open');
@@ -2052,6 +2073,53 @@ function closeMentorDrawer(){
 document.getElementById('mentorCloseBtn').addEventListener('click',closeMentorDrawer);
 mentorOverlay.addEventListener('click',closeMentorDrawer);
 document.addEventListener('keydown',(event)=>{ if(event.key==='Escape') closeMentorDrawer(); });
+
+function mentorEscapeHtml(value){
+  return String(value == null ? '' : value)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function renderMentorReport(report){
+  if(!report || typeof report !== 'object') throw new Error('Mentor returned an invalid report.');
+  const observations=Array.isArray(report.observations) ? report.observations.slice(0,3) : [];
+  const actions=Array.isArray(report.actions) ? report.actions.slice(0,3) : [];
+  const focus=report.focus || {};
+  mentorContent.innerHTML = `
+    <div class="mentor-report-hello">Aishwary, here's what I'd focus on today.</div>
+    <div class="mentor-report-summary">${mentorEscapeHtml(report.summary || 'Let’s focus on the strongest evidence-backed improvement opportunity today.')}</div>
+    <section class="mentor-report-card">
+      <div class="mentor-report-eyebrow">What I'm noticing</div>
+      <ul>${observations.map(item=>`<li>${mentorEscapeHtml(item)}</li>`).join('')}</ul>
+    </section>
+    <section class="mentor-report-card">
+      <div class="mentor-report-eyebrow">Your next move</div>
+      <ul>${actions.map(item=>`<li><strong>${mentorEscapeHtml(item.action || 'Focus drill')}</strong>${item.target ? ' · '+mentorEscapeHtml(item.target) : ''}<br><span>${mentorEscapeHtml(item.reason || '')}</span></li>`).join('')}</ul>
+    </section>
+    <section class="mentor-report-card mentor-report-focus">
+      <div class="mentor-report-eyebrow">One priority</div>
+      <b>${mentorEscapeHtml(focus.primary || 'Keep building on your current routine')}</b>
+      <div class="why">${mentorEscapeHtml(focus.why || '')}</div>
+      <div class="next"><strong>Today:</strong> ${mentorEscapeHtml(focus.nextStep || '')}</div>
+    </section>
+    <div class="mentor-report-foot">Based on your current AnswerOS performance. Your dashboard data was not modified.</div>
+  `;
+  mentorLoading.hidden=true;
+  mentorContent.hidden=false;
+}
+
+function renderMentorError(title,message){
+  mentorContent.innerHTML = `<div class="mentor-report-error"><h3>${mentorEscapeHtml(title || 'AI Mentor unavailable')}</h3><p>${mentorEscapeHtml(message || 'The Mentor could not complete this request.')}</p></div>`;
+  mentorLoading.hidden=true;
+  mentorContent.hidden=false;
+}
+
+window.addEventListener('message',(event)=>{
+  const data=event.data;
+  if(!data || data.type!=='answeros-mentor-result' || !mentorRequestNonce || data.nonce!==mentorRequestNonce) return;
+  if(data.ok) renderMentorReport(data.report);
+  else renderMentorError(data.title || 'AI Mentor unavailable', data.message || 'The Mentor request failed.');
+});
 
 function launchMentorReport(){
   if(!window.AnswerOSMentorOrchestrator || typeof window.AnswerOSMentorOrchestrator.buildPacket !== 'function'){
@@ -2070,8 +2138,9 @@ function launchMentorReport(){
   const packet = window.AnswerOSMentorOrchestrator.buildPacket({});
   if(!packet || packet.ok !== true) throw new Error('Unable to build the Mentor Packet.');
 
+  mentorRequestNonce = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())+'-'+Math.random().toString(36).slice(2);
   openMentorDrawer();
-  mentorFrame.hidden=true;
+  mentorContent.hidden=true;
   mentorLoading.hidden=false;
 
   const form=document.createElement('form');
@@ -2088,13 +2157,10 @@ function launchMentorReport(){
   };
   addField('mentorUi','1');
   addField('accessToken',token);
+  addField('nonce',mentorRequestNonce);
   addField('packet',JSON.stringify(packet));
 
   document.body.appendChild(form);
-  mentorFrame.onload=()=>{
-    mentorLoading.hidden=true;
-    mentorFrame.hidden=false;
-  };
   form.submit();
   setTimeout(()=>form.remove(),1000);
 }
