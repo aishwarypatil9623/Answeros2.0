@@ -284,8 +284,36 @@ function parseRequest_(e) {
     throw new Error('POST body is required.');
   }
 
-  const parsed = JSON.parse(e.postData.contents);
-  return parsed && typeof parsed === 'object' ? parsed : null;
+  const raw = e.postData.contents;
+
+  // Standard API clients send JSON.
+  const contentType = String(e.postData.type || '').toLowerCase();
+  if (contentType.indexOf('application/json') !== -1) {
+    const parsedJson = JSON.parse(raw);
+    return parsedJson && typeof parsedJson === 'object' ? parsedJson : null;
+  }
+
+  // Dashboard form submissions may arrive as application/x-www-form-urlencoded.
+  // Normalize them into the same object shape used by the JSON API.
+  const parsedForm = {};
+  raw.split('&').forEach(function(pair) {
+    const separator = pair.indexOf('=');
+    if (separator < 0) return;
+
+    const key = decodeURIComponent(pair.slice(0, separator).replace(/\\+/g, ' '));
+    const value = decodeURIComponent(pair.slice(separator + 1).replace(/\\+/g, ' '));
+    parsedForm[key] = value;
+  });
+
+  if (parsedForm.packet) {
+    try {
+      parsedForm.packet = JSON.parse(parsedForm.packet);
+    } catch (error) {
+      throw new Error('Mentor Packet form field is not valid JSON.');
+    }
+  }
+
+  return parsedForm;
 }
 
 function jsonOutput_(value) {
