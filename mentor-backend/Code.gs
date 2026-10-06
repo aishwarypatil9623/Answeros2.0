@@ -1,21 +1,11 @@
 /*
  * AnswerOS AI Mentor — standalone Gemini backend
  *
- * Phase 9:
+ * Phase 13:
  * - Secure server-side Gemini adapter intended for a SEPARATE Apps Script deployment.
  * - API key is read only from Script Properties (GEMINI_API_KEY).
- * - Model is configurable through GEMINI_MODEL; default is gemini-3.6-flash.
+ * - Mentor endpoint requires MENTOR_ACCESS_TOKEN.
  * - The file is NOT connected to the existing AnswerOS Apps Script.
- * - No existing Apps Script file is modified by this commit.
- *
- * Setup for a future deployment:
- *   Script Properties:
- *     GEMINI_API_KEY = <your restricted Gemini API key>
- *     GEMINI_MODEL   = gemini-3.6-flash
- *
- * The deployed endpoint accepts a Mentor Packet via POST and returns a
- * validated Mentor Report. Authentication/routing for the endpoint must
- * be configured before exposing it publicly.
  */
 
 const MENTOR_BACKEND_VERSION = 'mentor-gemini-backend-v1';
@@ -25,10 +15,7 @@ const MENTOR_REPORT_SCHEMA = {
   type: 'object',
   properties: {
     summary: { type: 'string' },
-    observations: {
-      type: 'array',
-      items: { type: 'string' }
-    },
+    observations: { type: 'array', items: { type: 'string' } },
     actions: {
       type: 'array',
       items: {
@@ -65,6 +52,14 @@ function doGet() {
 function doPost(e) {
   try {
     const body = parseRequest_(e);
+
+    if (!isAuthorized_(body)) {
+      return jsonOutput_({
+        ok: false,
+        error: 'UNAUTHORIZED'
+      });
+    }
+
     const packet = body && body.packet ? body.packet : body;
 
     if (!packet || typeof packet !== 'object') {
@@ -92,6 +87,22 @@ function doPost(e) {
   }
 }
 
+function isAuthorized_(body) {
+  const expected = PropertiesService
+    .getScriptProperties()
+    .getProperty('MENTOR_ACCESS_TOKEN');
+
+  if (!expected) {
+    throw new Error('MENTOR_ACCESS_TOKEN is not configured in Script Properties.');
+  }
+
+  const supplied = body && typeof body.accessToken === 'string'
+    ? body.accessToken
+    : '';
+
+  return supplied === expected;
+}
+
 function generateMentorReport_(packet) {
   const properties = PropertiesService.getScriptProperties();
   const apiKey = properties.getProperty('GEMINI_API_KEY');
@@ -101,7 +112,6 @@ function generateMentorReport_(packet) {
   }
 
   const model = properties.getProperty('GEMINI_MODEL') || DEFAULT_MODEL;
-
   const prompt = buildMentorPrompt_(packet);
 
   const url =
@@ -123,10 +133,7 @@ function generateMentorReport_(packet) {
         ].join(' ')
       }]
     },
-    contents: [{
-      role: 'user',
-      parts: [{ text: prompt }]
-    }],
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: MENTOR_REPORT_SCHEMA,
@@ -137,9 +144,7 @@ function generateMentorReport_(packet) {
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
-    headers: {
-      'x-goog-api-key': apiKey
-    },
+    headers: { 'x-goog-api-key': apiKey },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
@@ -181,17 +186,11 @@ function extractText_(data) {
   if (!Array.isArray(candidates)) return '';
 
   for (let i = 0; i < candidates.length; i++) {
-    const parts =
-      candidates[i] &&
-      candidates[i].content &&
-      candidates[i].content.parts;
-
+    const parts = candidates[i] && candidates[i].content && candidates[i].content.parts;
     if (!Array.isArray(parts)) continue;
 
     for (let j = 0; j < parts.length; j++) {
-      if (parts[j] && typeof parts[j].text === 'string') {
-        return parts[j].text;
-      }
+      if (parts[j] && typeof parts[j].text === 'string') return parts[j].text;
     }
   }
 
@@ -243,11 +242,7 @@ function validateReport_(report) {
   });
 
   report.actions.forEach(function (item) {
-    if (
-      !item ||
-      typeof item.action !== 'string' ||
-      typeof item.reason !== 'string'
-    ) {
+    if (!item || typeof item.action !== 'string' || typeof item.reason !== 'string') {
       throw new Error('Mentor Report contains an invalid action.');
     }
   });
