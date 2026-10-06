@@ -105,9 +105,9 @@ function getRequestParameter_(e, name) {
 }
 
 function buildMentorReportHtml_(report) {
-  const observations=report.observations.map(function(item){return '<li>'+escapeHtml_(item)+'</li>';}).join('');
-  const actions=report.actions.map(function(item){return '<li><strong>'+escapeHtml_(item.action)+'</strong>'+(item.target?' · '+escapeHtml_(item.target):'')+'<br><span>'+escapeHtml_(item.reason)+'</span></li>';}).join('');
-  return '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f6;color:#18211b;margin:0;padding:32px}.wrap{max-width:820px;margin:0 auto}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2c8a46}h1{font-size:30px;margin:6px 0 8px}.summary{font-size:17px;line-height:1.55;background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:20px;margin:22px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:18px}h2{font-size:14px;margin:0 0 12px}.focus{border-left:4px solid #2c8a46}.focus b{display:block;font-size:18px;margin-bottom:7px}ul{margin:0;padding-left:20px}li{margin:0 0 12px;line-height:1.45}li span{color:#526057;font-size:14px}.foot{margin-top:18px;color:#6a756d;font-size:12px}@media(max-width:700px){body{padding:18px}.grid{grid-template-columns:1fr}h1{font-size:25px}}</style></head><body><main class="wrap"><div class="eyebrow">AnswerOS · AI Mentor</div><h1>Today\'s Mentor Report</h1><div class="summary">'+escapeHtml_(report.summary)+'</div><div class="grid"><section class="card"><h2>What I\'m seeing</h2><ul>'+observations+'</ul></section><section class="card"><h2>What to do next</h2><ul>'+actions+'</ul></section></div><section class="card focus" style="margin-top:16px"><h2>Primary Focus</h2><b>'+escapeHtml_(report.focus.primary)+'</b><div>'+escapeHtml_(report.focus.why)+'</div><div style="margin-top:10px"><strong>Next step:</strong> '+escapeHtml_(report.focus.nextStep)+'</div></section><div class="foot">Generated from the current AnswerOS Mentor Packet. No dashboard data was modified.</div></main></body></html>';
+  const observations=report.observations.slice(0,3).map(function(item){return '<li>'+escapeHtml_(item)+'</li>';}).join('');
+  const actions=report.actions.slice(0,3).map(function(item){return '<li><strong>'+escapeHtml_(item.action)+'</strong>'+(item.target?' · '+escapeHtml_(item.target):'')+'<br><span>'+escapeHtml_(item.reason)+'</span></li>';}).join('');
+  return '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:transparent;color:#18211b;margin:0;padding:22px}.wrap{max-width:760px;margin:0 auto}.hello{font-size:14px;color:#526057;margin-bottom:5px}.summary{font-size:18px;line-height:1.48;font-weight:650;background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:18px;margin:0 0 14px;box-shadow:0 4px 18px rgba(20,35,25,.04)}.card{background:#fff;border:1px solid #e1e7e2;border-radius:16px;padding:17px;margin-bottom:12px}.eyebrow{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2c8a46;margin-bottom:6px}h2{font-size:13px;margin:0 0 10px}ul{margin:0;padding-left:19px}li{margin:0 0 10px;line-height:1.42;font-size:14px}li:last-child{margin-bottom:0}li span{color:#526057;font-size:12.5px}.focus{border-left:4px solid #2c8a46}.focus b{display:block;font-size:19px;margin-bottom:6px}.focus div{font-size:13.5px;line-height:1.45}.next{margin-top:9px}.foot{margin-top:14px;color:#7a847d;font-size:10.5px}@media(max-width:700px){body{padding:16px}.summary{font-size:17px}}</style></head><body><main class="wrap"><div class="hello">Aishwary, here\'s what I\'d focus on today.</div><div class="summary">'+escapeHtml_(report.summary)+'</div><section class="card"><div class="eyebrow">What I\'m noticing</div><ul>'+observations+'</ul></section><section class="card"><div class="eyebrow">Your next move</div><ul>'+actions+'</ul></section><section class="card focus"><div class="eyebrow">One priority</div><b>'+escapeHtml_(report.focus.primary)+'</b><div>'+escapeHtml_(report.focus.why)+'</div><div class="next"><strong>Today:</strong> '+escapeHtml_(report.focus.nextStep)+'</div></section><div class="foot">Based on your current AnswerOS performance. Your dashboard data was not modified.</div></main></body></html>';
 }
 
 function buildMentorErrorHtml_(title,message) {
@@ -159,7 +159,9 @@ function generateMentorReport_(packet) {
           'Do not invent scores, trends, weaknesses, study activity, or facts.',
           'Use the deterministic analysis and policy as evidence.',
           'Give practical answer-writing actions, not generic motivation.',
-          'Keep the report concise and specific.',
+          'Address the candidate as Aishwary and speak directly using you/your.',
+          'Sound like a sharp, supportive human mentor who knows the candidate\'s work.',
+          'Be concise: prioritize the few things that matter today and avoid formal report language.',
           'Return JSON matching the supplied response schema.'
         ].join(' ')
       }]
@@ -206,8 +208,8 @@ function buildMentorPrompt_(packet) {
     JSON.stringify(packet),
     '',
     'TASK:',
-    'Produce the daily UPSC answer-writing mentor report.',
-    'Prioritize the supplied evidence-backed actions.',
+    'Produce a concise daily UPSC answer-writing mentor message for Aishwary.',
+    'Address Aishwary directly and prioritize the supplied evidence-backed actions.',
     'Do not add claims that cannot be supported by the packet.'
   ].join('\n');
 }
