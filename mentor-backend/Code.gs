@@ -51,7 +51,7 @@ function doGet() {
 
 function doPost(e) {
   try {
-    if (e && e.parameter && e.parameter.mentorUi === '1') {
+    if (getRequestParameter_(e, 'mentorUi') === '1') {
       return handleMentorUiPost_(e);
     }
     const body=parseRequest_(e);
@@ -67,16 +67,41 @@ function doPost(e) {
 }
 
 function handleMentorUiPost_(e) {
-  const accessToken=e && e.parameter ? e.parameter.accessToken || '' : '';
+  const accessToken=getRequestParameter_(e, 'accessToken');
   if(!isAuthorized_({accessToken})) {
     return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Unauthorized','The Mentor access token was rejected. No Gemini request was made.')).setTitle('AnswerOS AI Mentor');
   }
-  const rawPacket=e && e.parameter ? e.parameter.packet || '' : '';
+  const rawPacket=getRequestParameter_(e, 'packet');
   if(!rawPacket) return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Missing Mentor Packet','The dashboard did not send a Mentor Packet.')).setTitle('AnswerOS AI Mentor');
   const packet=JSON.parse(rawPacket);
   if(!packet || typeof packet!=='object') return HtmlService.createHtmlOutput(buildMentorErrorHtml_('Invalid Mentor Packet','The submitted Mentor Packet could not be parsed.')).setTitle('AnswerOS AI Mentor');
   const report=generateMentorReport_(packet);
   return HtmlService.createHtmlOutput(buildMentorReportHtml_(report)).setTitle('AnswerOS AI Mentor');
+}
+
+function getRequestParameter_(e, name) {
+  if (e && e.parameter && typeof e.parameter[name] === 'string') {
+    return e.parameter[name];
+  }
+
+  const raw = e && e.postData && typeof e.postData.contents === 'string'
+    ? e.postData.contents
+    : '';
+
+  if (!raw) return '';
+
+  const pairs = raw.split('&');
+  for (let i = 0; i < pairs.length; i++) {
+    const separator = pairs[i].indexOf('=');
+    if (separator < 0) continue;
+
+    const key = decodeURIComponent(pairs[i].slice(0, separator).replace(/\\+/g, ' '));
+    if (key !== name) continue;
+
+    return decodeURIComponent(pairs[i].slice(separator + 1).replace(/\\+/g, ' '));
+  }
+
+  return '';
 }
 
 function buildMentorReportHtml_(report) {
