@@ -136,3 +136,41 @@ function assertMentorBackend_(condition, message) {
     throw new Error(message);
   }
 }
+
+
+/*
+ * Live Gemini smoke test.
+ * Requires GEMINI_API_KEY and GEMINI_MODEL in Script Properties.
+ * Uses a tiny synthetic Mentor Packet and makes one Gemini request.
+ */
+function runMentorLiveTest() {
+  const packet = {
+    analysis: {
+      scoreTrend: 'improving',
+      priorities: [{
+        type: 'gap',
+        key: 'analytical_depth',
+        evidence: { average: 5.4, sample: 6 }
+      }]
+    },
+    plan: {
+      actions: [{
+        action: 'gap_drill',
+        reason: 'Analytical depth is the strongest recurring evidence-backed gap.',
+        target: 'analytical_depth'
+      }]
+    },
+    memory: {
+      activeWeaknesses: ['analytical_depth']
+    }
+  };
+
+  const report = generateMentorReport_(packet);
+
+  console.log('AI Mentor Live Gemini Test');
+  console.log('Status: PASS');
+  console.log('Model: ' + (PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || DEFAULT_MODEL));
+  console.log(JSON.stringify(report, null, 2));
+
+  return report;
+}
