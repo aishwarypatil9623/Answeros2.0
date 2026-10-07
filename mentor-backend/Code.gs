@@ -118,7 +118,8 @@ function buildMentorBridgeHtml_(payload, nonce) {
   const safePayload = JSON.stringify(payload).replace(/</g,'\\u003c');
   const safeNonce = JSON.stringify(String(nonce || '')).replace(/</g,'\\u003c');
   return '<!doctype html><html><body><script>' +
-    'window.parent.postMessage(Object.assign({type:"answeros-mentor-result",nonce:'+safeNonce+'},'+safePayload+'), "*");' +
+    '(window.opener || window.parent).postMessage(Object.assign({type:"answeros-mentor-result",nonce:'+safeNonce+'},'+safePayload+'), "*");' +
+    'setTimeout(function(){ if(window.opener){ window.close(); } }, 50);' +
     '</script></body></html>';
 }
 

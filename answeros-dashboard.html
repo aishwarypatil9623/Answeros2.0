@@ -432,8 +432,7 @@
   .mentor-drawer-head p{margin:5px 0 0;font-size:12px;color:var(--muted,#68736c)}
   .mentor-close-btn{width:32px;height:32px;border:1px solid var(--border,#e2e8e3);border-radius:10px;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer}
   .mentor-drawer-body{position:relative;flex:1;min-height:0}
-  .mentor-bridge{position:absolute;width:1px;height:1px;border:0;opacity:0;pointer-events:none}
-  .mentor-content{height:100%;overflow:auto;padding:22px;background:var(--bg,#f7f9f7)}
+    .mentor-content{height:100%;overflow:auto;padding:22px;background:var(--bg,#f7f9f7)}
   .mentor-content[hidden]{display:none}
   .mentor-report-hello{font-size:13px;color:#526057;margin-bottom:7px}
   .mentor-report-summary{font-size:17px;line-height:1.48;font-weight:650;background:#fff;border:1px solid var(--line,#e1e7e2);border-radius:15px;padding:17px;margin-bottom:12px;box-shadow:0 4px 18px rgba(20,35,25,.04)}
@@ -452,7 +451,7 @@
   .mentor-report-error h3{margin:0 0 7px;font-size:16px}
   .mentor-report-error p{margin:0;color:#526057;font-size:12.5px;line-height:1.5}
   .mentor-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted,#68736c);font-size:13px;background:var(--bg,#f7f9f7);z-index:2}
-  .mentor-loading[hidden],.mentor-frame[hidden]{display:none}
+  .mentor-loading[hidden]{display:none}
   .mentor-spinner{width:22px;height:22px;border:2px solid rgba(44,138,70,.18);border-top-color:#2c8a46;border-radius:50%;animation:mentorSpin .8s linear infinite}
   @keyframes mentorSpin{to{transform:rotate(360deg)}}
   @media(max-width:700px){.mentor-drawer{width:100vw}.mentor-drawer-head{padding:18px}}
@@ -527,7 +526,6 @@
             <div class="mentor-spinner"></div>
             <div>Looking at your latest answers…</div>
           </div>
-          <iframe id="mentorFrame" name="answerosMentorFrame" title="AI Mentor bridge" class="mentor-bridge" aria-hidden="true"></iframe>
           <div id="mentorContent" class="mentor-content" hidden></div>
         </div>
       </aside>
@@ -2053,7 +2051,6 @@ const MENTOR_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzqfRm0cWuhI
 const MENTOR_TOKEN_KEY = 'answeros_mentor_access_token_v1';
 const mentorDrawer = document.getElementById('mentorDrawer');
 const mentorOverlay = document.getElementById('mentorOverlay');
-const mentorFrame = document.getElementById('mentorFrame');
 const mentorLoading = document.getElementById('mentorLoading');
 const mentorContent = document.getElementById('mentorContent');
 let mentorRequestNonce = '';
@@ -2143,10 +2140,17 @@ function launchMentorReport(){
   mentorContent.hidden=true;
   mentorLoading.hidden=false;
 
+  const mentorWindow = window.open('', 'answerosMentorBridge', 'popup,width=420,height=720');
+  if(!mentorWindow){
+    throw new Error('Your browser blocked the Mentor bridge window. Please allow pop-ups for AnswerOS and try again.');
+  }
+  mentorWindow.document.write('<!doctype html><html><body style="font:14px system-ui;padding:24px;color:#526057">Connecting to your Mentor…</body></html>');
+  mentorWindow.document.close();
+
   const form=document.createElement('form');
   form.method='POST';
   form.action=MENTOR_BACKEND_URL;
-  form.target='answerosMentorFrame';
+  form.target='answerosMentorBridge';
   form.style.display='none';
 
   const addField=(name,value)=>{
