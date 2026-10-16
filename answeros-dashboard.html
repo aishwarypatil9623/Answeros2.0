@@ -602,7 +602,7 @@
       <div class="grid-resizer"></div>
 
       <section class="card">
-        <div class="card-head"><h3>Recent Answers</h3><a href="answeros-all-answers.html" class="link-btn" style="text-decoration:none;">View All <span class="icInline" data-ic="arrow"></span></a></div>
+        <div class="card-head"><h3>Recent Answers</h3><a href="https://aishwarypatil9623.github.io/Answeros2.0/answeros-all-answers.html" class="link-btn" style="text-decoration:none;">View All <span class="icInline" data-ic="arrow"></span></a></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
           <select id="raSubjFilter" class="dropdown" style="font-family:inherit;font-size:11px;appearance:none;background:#fff;flex:1;min-width:80px;">
             <option value="all">All Subjects</option>
@@ -824,7 +824,7 @@ document.getElementById('icStreak').innerHTML = iconSVG('flame');
 document.querySelectorAll('.icInline').forEach(el=>{ el.innerHTML = iconSVG(el.dataset.ic, 13); el.style.display='inline-flex'; el.style.verticalAlign='middle'; });
 
 document.getElementById('nav').innerHTML = [
-  ['Dashboard','grid','answeros-dashboard.html',true],['All Answers','list','answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html'],
+  ['Dashboard','grid','answeros-dashboard.html',true],['All Answers','list','https://aishwarypatil9623.github.io/Answeros2.0/answeros-all-answers.html'],['Analytics','bar','answeros-analytics.html'],
   ['PYQ Tracker','archive','answeros-pyq-tracker.html'],['Learnings','book','answeros-learnings.html'],['Notes','notes','answeros-notes.html'],['Revision Hub','refresh','answeros-revision-hub.html'],['Flashcards','layers','answeros-flashcards.html'],
   ['Calendar','calendar','answeros-calendar.html'],['Goals','flag','answeros-goals.html'],['Settings','gear','answeros-settings.html']
 ].map(([label,ic,href,active])=> href
@@ -1299,7 +1299,7 @@ function renderScoreTrend(){
       if(!elements.length) return;
       const el = elements.find(e=>e.datasetIndex===0) || elements[0];
       const a = data[el.index];
-      if(a) window.location.href = `answeros-all-answers.html?open=${encodeURIComponent(a.id)}`;
+      if(a) window.location.href = `https://aishwarypatil9623.github.io/Answeros2.0/answeros-all-answers.html?open=${encodeURIComponent(a.id)}`;
     }
   };
   if(scoreTrendChart){ scoreTrendChart.data = cfg; scoreTrendChart.options = options; scoreTrendChart.update(); }
