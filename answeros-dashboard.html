@@ -219,6 +219,21 @@
   .qs-val{font-size:14px;font-weight:800;line-height:1;letter-spacing:-0.01em;white-space:nowrap;}
   .qs-val span{font-size:10px;font-weight:600;color:var(--ink-400,#9aa0a5);margin-left:1px;}
   .qs-label{font-size:9.5px;color:var(--ink-500);white-space:nowrap;margin-top:1px;}
+  .qs-type-grid{display:grid;grid-template-columns:repeat(2,minmax(190px,1fr));gap:10px;min-width:0;}
+  .qs-type-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);transition:border-color .15s ease,transform .15s ease;}
+  .qs-type-card.clickable{cursor:pointer;}
+  .qs-type-card.clickable:hover{border-color:var(--green-600);transform:translateY(-1px);}
+  .qs-type-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .qs-type-title{font-size:12px;font-weight:800;color:var(--ink-700);}
+  .qs-type-count{font-size:10px;color:var(--ink-500);white-space:nowrap;}
+  .qs-type-score-row{display:flex;align-items:baseline;gap:5px;}
+  .qs-type-score{font-size:25px;line-height:1;font-weight:850;letter-spacing:-.04em;color:var(--ink-800);}
+  .qs-type-score-unit{font-size:11px;font-weight:700;color:var(--ink-500);}
+  .qs-type-bar{height:6px;border-radius:999px;background:var(--green-50,#e8f3ed);overflow:hidden;}
+  .qs-type-bar-fill{height:100%;border-radius:inherit;background:var(--green-600);transition:width .2s ease;}
+  .qs-type-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--ink-500);}
+  .qs-type-meta strong{color:var(--ink-700);font-weight:800;}
+  @media(max-width:700px){.qs-type-grid{grid-template-columns:1fr;}.qs-type-card{padding:11px 12px;}}
 
   .grid3{display:grid;grid-template-columns: var(--c1,1.3fr) 14px var(--c2,1.3fr) 14px var(--c3,1.15fr);gap:0 0;margin-bottom:16px;align-items:stretch;}
   .grid3b{display:grid;grid-template-columns: 1.3fr 1.3fr 1fr;gap:16px;margin-bottom:16px;}
@@ -1096,6 +1111,26 @@ function jumpToRecentSorted(sortVal){
 
 function renderQuickStats(){
   document.getElementById('quickStats').innerHTML = qsGroups.map(g=>{
+    if(g.label==='By Question Type'){
+      const typeCard = (label, stats, typeVal) => {
+        const available = !!stats;
+        const score = available ? Math.max(0,Math.min(100,Number(stats.avg)||0)) : 0;
+        const words = available && stats.avgWords!=null ? Math.max(0,Number(stats.avgWords)||0) : null;
+        const limit = available && stats.limit!=null ? Number(stats.limit) : null;
+        const wordPct = words!=null && limit>0 ? Math.min(100,Math.round(words/limit*100)) : 0;
+        const wordWarn = words!=null && limit>0 && words>limit;
+        const action = available ? {type:'trend-filter',val:typeVal} : null;
+        const actionAttr = action ? `data-action='${JSON.stringify(action)}'` : '';
+        return `<div class="qs-type-card${action?' clickable':''}" ${actionAttr} ${action?'role="button" tabindex="0" aria-label="View '+label+' score trend"':''}>
+          <div class="qs-type-head"><span class="qs-type-title">${label}</span><span class="qs-type-count">${available?stats.n+' answers':'No answers yet'}</span></div>
+          <div class="qs-type-score-row"><span class="qs-type-score">${available?score.toFixed(0):'—'}</span><span class="qs-type-score-unit">${available?'% average score':''}</span></div>
+          <div class="qs-type-bar" role="progressbar" aria-label="${label} average score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${available?score:0}"><div class="qs-type-bar-fill" style="width:${available?score:0}%;${wordWarn?'background:#c0503a;':''}"></div></div>
+          <div class="qs-type-meta"><span>Avg. words</span><strong style="${wordWarn?'color:#c0503a;':''}">${words==null?'—':Math.round(words)+' / '+(limit||'—')}${wordWarn?' · over limit':''}</strong></div>
+          ${words!=null&&limit>0?`<div class="qs-type-bar" aria-hidden="true"><div class="qs-type-bar-fill" style="width:${wordPct}%;background:${wordWarn?'#c0503a':'var(--green-600)'};"></div></div>`:''}
+        </div>`;
+      };
+      return `<div class="qs-group qs-question-type-group"><div class="qs-group-label">${g.label}</div><div class="qs-type-grid">${typeCard('10-mark questions',stats10,'10')}${typeCard('15-mark questions',stats15,'15')}</div></div>`;
+    }
     const chipsHtml = g.chips.map(([ic,val,unit,label,warn,action])=>{
       if(ic==='badge'){
         const t = TIERS.find(x=>x.key===action.key);
@@ -1120,7 +1155,7 @@ function renderQuickStats(){
   }).join('');
 
   document.querySelectorAll('#quickStats [data-action]').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
+    const runAction = ()=>{
       const action = JSON.parse(chip.dataset.action);
       if(action.type==='sort-recent') jumpToRecentSorted(action.sort);
       else if(action.type==='trend-filter') jumpToScoreTrend(action.val);
@@ -1129,6 +1164,10 @@ function renderQuickStats(){
         renderQuickStats();
         renderRecent();
       }
+    };
+    chip.addEventListener('click', runAction);
+    if(chip.classList.contains('qs-type-card')) chip.addEventListener('keydown', event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();runAction();}
     });
   });
 }
